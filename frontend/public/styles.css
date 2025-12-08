@@ -60,8 +60,12 @@ body {
   box-shadow: var(--shadow);
 }
 
+.graph-card { grid-column: 1 / -1; }
+.graph { height: 380px; border: 1px solid var(--border); border-radius: 12px; background: #0b1220; }
+
 h2 { margin: 0 0 12px; font-size: 18px; }
 h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; letter-spacing: 0.02em; }
+.muted { color: var(--muted); font-size: 13px; }
 
 label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; }
 input, select, button {

@@ -1,4 +1,6 @@
-﻿class Graph {
+﻿import { createVisRenderer } from "./graph/visNetworkGraph.js";
+
+class Graph {
   constructor() {
     this.nodes = new Map();
     this.edges = [];
@@ -7,7 +9,7 @@
 
   addNode(id, label = "") {
     const key = id.trim();
-    if (!key) throw new Error("Düğüm kimliği boş olamaz");
+    if (!key) throw new Error("Dugum kimligi bos olamaz");
     if (this.nodes.has(key)) throw new Error("Bu kimlik zaten var");
     this.nodes.set(key, label.trim() || key);
     this.adj.set(key, new Set());
@@ -17,16 +19,24 @@
     const a = from.trim();
     const b = to.trim();
     if (!this.nodes.has(a) || !this.nodes.has(b)) {
-      throw new Error("Önce düğümleri ekleyin (kaynak/hedef yok)");
+      throw new Error("Once dugumleri ekleyin (kaynak/hedef yok)");
     }
     this.adj.get(a).add(b);
     this.adj.get(b).add(a);
-    this.edges.push({ from: a, to: b, weight: weight === "" ? null : weight });
+    const parsed = this.#parseWeight(weight);
+    this.edges.push({ from: a, to: b, weight: parsed });
+  }
+
+  #parseWeight(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const num = Number(value);
+    if (Number.isFinite(num)) return num;
+    return null;
   }
 
   bfs(start) {
     const s = start.trim();
-    if (!this.nodes.has(s)) throw new Error("Başlangıç düğümü yok");
+    if (!this.nodes.has(s)) throw new Error("Baslangic dugumu yok");
     const visited = new Set([s]);
     const order = [];
     const queue = [s];
@@ -45,7 +55,7 @@
 
   dfs(start) {
     const s = start.trim();
-    if (!this.nodes.has(s)) throw new Error("Başlangıç düğümü yok");
+    if (!this.nodes.has(s)) throw new Error("Baslangic dugumu yok");
     const visited = new Set();
     const order = [];
     const stack = [s];
@@ -70,6 +80,7 @@
 }
 
 const graph = new Graph();
+const renderer = createVisRenderer(document.getElementById("graph-viewport"));
 
 const nodeForm = document.getElementById("node-form");
 const edgeForm = document.getElementById("edge-form");
@@ -83,12 +94,12 @@ function renderNodes() {
   nodeList.innerHTML = "";
   const entries = Array.from(graph.nodes.entries());
   if (!entries.length) {
-    nodeList.innerHTML = '<li>Henüz düğüm yok</li>';
+    nodeList.innerHTML = '<li>Henuz dugum yok</li>';
     return;
   }
   entries.forEach(([id, label]) => {
     const li = document.createElement("li");
-    li.textContent = `${id} — ${label}`;
+    li.textContent = `${id} - ${label}`;
     nodeList.appendChild(li);
   });
 }
@@ -96,15 +107,21 @@ function renderNodes() {
 function renderEdges() {
   edgeList.innerHTML = "";
   if (!graph.edges.length) {
-    edgeList.innerHTML = '<li>Henüz kenar yok</li>';
+    edgeList.innerHTML = '<li>Henuz kenar yok</li>';
     return;
   }
   graph.edges.forEach(({ from, to, weight }) => {
     const li = document.createElement("li");
     const w = weight === null ? "" : ` (w=${weight})`;
-    li.textContent = `${from} ⇄ ${to}${w}`;
+    li.textContent = `${from} -> ${to}${w}`;
     edgeList.appendChild(li);
   });
+}
+
+function refreshView() {
+  renderNodes();
+  renderEdges();
+  renderer.sync(graph);
 }
 
 function setResult(text, isError = false) {
@@ -119,8 +136,8 @@ nodeForm.addEventListener("submit", (e) => {
   const label = form.get("label") || "";
   try {
     graph.addNode(id, label);
-    renderNodes();
-    setResult(`Düğüm eklendi: ${id}`);
+    refreshView();
+    setResult(`Dugum eklendi: ${id}`);
     nodeForm.reset();
   } catch (err) {
     setResult(err.message, true);
@@ -135,7 +152,7 @@ edgeForm.addEventListener("submit", (e) => {
   const weight = form.get("weight");
   try {
     graph.addEdge(from, to, weight === null ? null : weight);
-    renderEdges();
+    refreshView();
     setResult(`Kenar eklendi: ${from} - ${to}`);
     edgeForm.reset();
   } catch (err) {
@@ -152,7 +169,7 @@ algoForm.addEventListener("submit", (e) => {
     let order = [];
     if (algorithm === "bfs") order = graph.bfs(start);
     else order = graph.dfs(start);
-    setResult(`${algorithm.toUpperCase()} sırasi: ${order.join(" → ")}`);
+    setResult(`${algorithm.toUpperCase()} sirasi: ${order.join(" -> ")}`);
   } catch (err) {
     setResult(err.message, true);
   }
@@ -160,10 +177,9 @@ algoForm.addEventListener("submit", (e) => {
 
 resetBtn.addEventListener("click", () => {
   graph.reset();
-  renderNodes();
-  renderEdges();
+  renderer.reset();
+  refreshView();
   setResult("Graf temizlendi");
 });
 
-renderNodes();
-renderEdges();
+refreshView();
