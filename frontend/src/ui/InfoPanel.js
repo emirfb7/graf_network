@@ -1,0 +1,1 @@
+// Placeholder info panel component

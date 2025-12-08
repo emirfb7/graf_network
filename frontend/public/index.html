@@ -1,0 +1,88 @@
+﻿<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sosyal Ağ Graf</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Sosyal Ağ Graf</p>
+        <h1>Hızlı deneme arayüzü</h1>
+        <p class="subtitle">Düğüm ve kenar ekle, grafi görüntüle, BFS/DFS çalıştır.</p>
+      </div>
+      <div class="pill">Frontend-only demo</div>
+    </header>
+
+    <main class="grid">
+      <section class="card">
+        <h2>Düğüm ekle</h2>
+        <form id="node-form" class="stack">
+          <label>Kimlik
+            <input name="id" required placeholder="örn. A">
+          </label>
+          <label>Etiket
+            <input name="label" placeholder="Gösterilecek ad (isteğe bağlı)">
+          </label>
+          <button type="submit">Düğüm ekle</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Kenar ekle</h2>
+        <form id="edge-form" class="stack">
+          <label>Kaynak
+            <input name="from" required placeholder="örn. A">
+          </label>
+          <label>Hedef
+            <input name="to" required placeholder="örn. B">
+          </label>
+          <label>Ağırlık
+            <input name="weight" type="number" step="any" placeholder="İsteğe bağlı">
+          </label>
+          <button type="submit">Kenar ekle</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Algoritma çalıştır</h2>
+        <form id="algo-form" class="stack">
+          <label>Algoritma
+            <select name="algorithm">
+              <option value="bfs">BFS</option>
+              <option value="dfs">DFS</option>
+            </select>
+          </label>
+          <label>Başlangıç düğümü
+            <input name="start" required placeholder="örn. A">
+          </label>
+          <button type="submit">Çalıştır</button>
+        </form>
+        <pre id="algo-result" class="output" aria-live="polite">Sonuçlar burada görünecek</pre>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <h2>Graf özeti</h2>
+          <button id="reset-graph" type="button" class="ghost">Temizle</button>
+        </div>
+        <div class="summary-grid">
+          <div>
+            <h3>Düğümler</h3>
+            <ul id="node-list" class="list"></ul>
+          </div>
+          <div>
+            <h3>Kenarlar</h3>
+            <ul id="edge-list" class="list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../src/main.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+"""Algorithm base class placeholder."""

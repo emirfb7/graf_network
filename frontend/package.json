@@ -1,0 +1,8 @@
+{
+  "name": "sosyal-ag-graf",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "echo \"define a dev server (vite, live-server, etc.)\""
+  }
+}
