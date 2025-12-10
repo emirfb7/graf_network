@@ -91,6 +91,9 @@ const algoResult = document.getElementById("algo-result");
 const resetBtn = document.getElementById("reset-graph");
 const sidebar = document.getElementById("sidebar");
 const toggleSidebarBtn = document.getElementById("toggle-sidebar");
+const fileForm = document.getElementById("file-form");
+const fileInput = document.getElementById("file-input");
+const fileStatus = document.getElementById("file-status");
 
 function renderNodes() {
   nodeList.innerHTML = "";
@@ -133,7 +136,7 @@ function setResult(text, isError = false) {
 
 function toggleSidebar() {
   const collapsed = sidebar.classList.toggle("collapsed");
-  toggleSidebarBtn.textContent = collapsed ? "Paneli goster" : "Paneli gizle";
+  toggleSidebarBtn.textContent = collapsed ? "Open sidebar" : "Close sidebar";
   toggleSidebarBtn.setAttribute("aria-expanded", (!collapsed).toString());
 }
 
@@ -190,6 +193,22 @@ resetBtn.addEventListener("click", () => {
   renderer.reset();
   refreshView();
   setResult("Graf temizlendi");
+});
+
+fileForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!fileInput.files || !fileInput.files.length) {
+    fileStatus.textContent = "Dosya secilmedi";
+    return;
+  }
+  const file = fileInput.files[0];
+  const allowed = ["csv", "xls", "xlsx"];
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (!allowed.includes(ext)) {
+    fileStatus.textContent = "Sadece CSV veya Excel yukleyin";
+    return;
+  }
+  fileStatus.textContent = `Yukleme hazir: ${file.name}`;
 });
 
 refreshView();

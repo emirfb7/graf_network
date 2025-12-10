@@ -8,79 +8,93 @@
   <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
 </head>
 <body>
-  <button id="toggle-sidebar" class="sidebar-toggle" aria-expanded="true">Paneli gizle</button>
+  <button id="toggle-sidebar" class="sidebar-toggle" aria-expanded="true">Close sidebar</button>
   <div class="layout">
     <aside id="sidebar" class="sidebar">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">Sosyal Ag Graf</p>
-          <h1>Hizli deneme arayuzu</h1>
-          <p class="subtitle">Dugum ve kenar ekle, BFS/DFS calistir.</p>
-        </div>
-      </header>
-
-      <section class="card">
-        <h2>Dugum ekle</h2>
-        <form id="node-form" class="stack">
-          <label>Kimlik
-            <input name="id" required placeholder="orn. A">
-          </label>
-          <label>Etiket
-            <input name="label" placeholder="Gosterilecek ad (istege bagli)">
-          </label>
-          <button type="submit">Dugum ekle</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Kenar ekle</h2>
-        <form id="edge-form" class="stack">
-          <label>Kaynak
-            <input name="from" required placeholder="orn. A">
-          </label>
-          <label>Hedef
-            <input name="to" required placeholder="orn. B">
-          </label>
-          <label>Agirlik
-            <input name="weight" type="number" step="any" placeholder="Istege bagli">
-          </label>
-          <button type="submit">Kenar ekle</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Algoritma calistir</h2>
-        <form id="algo-form" class="stack">
-          <label>Algoritma
-            <select name="algorithm">
-              <option value="bfs">BFS</option>
-              <option value="dfs">DFS</option>
-            </select>
-          </label>
-          <label>Baslangic dugumu
-            <input name="start" required placeholder="orn. A">
-          </label>
-          <button type="submit">Calistir</button>
-        </form>
-        <pre id="algo-result" class="output" aria-live="polite">Sonuclar burada gorunecek</pre>
-      </section>
-
-      <section class="card">
-        <div class="section-heading">
-          <h2>Graf ozeti</h2>
-          <button id="reset-graph" type="button" class="ghost">Temizle</button>
-        </div>
-        <div class="summary-grid">
+      <div class="sidebar-content">
+        <header class="hero">
           <div>
-            <h3>Dugumler</h3>
-            <ul id="node-list" class="list"></ul>
+            <p class="eyebrow">Sosyal Ag Graf</p>
+            <h1>Hizli deneme arayuzu</h1>
+            <p class="subtitle">Dugum ve kenar ekle, BFS/DFS calistir.</p>
           </div>
-          <div>
-            <h3>Kenarlar</h3>
-            <ul id="edge-list" class="list"></ul>
+        </header>
+
+        <section class="card">
+          <h2>Dugum ekle</h2>
+          <form id="node-form" class="stack">
+            <label>Kimlik
+              <input name="id" required placeholder="orn. A">
+            </label>
+            <label>Etiket
+              <input name="label" placeholder="Gosterilecek ad (istege bagli)">
+            </label>
+            <button type="submit">Dugum ekle</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Kenar ekle</h2>
+          <form id="edge-form" class="stack">
+            <label>Kaynak
+              <input name="from" required placeholder="orn. A">
+            </label>
+            <label>Hedef
+              <input name="to" required placeholder="orn. B">
+            </label>
+            <label>Agirlik
+              <input name="weight" type="number" step="any" placeholder="Istege bagli">
+            </label>
+            <button type="submit">Kenar ekle</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Algoritma calistir</h2>
+          <form id="algo-form" class="stack">
+            <label>Algoritma
+              <select name="algorithm">
+                <option value="bfs">BFS</option>
+                <option value="dfs">DFS</option>
+              </select>
+            </label>
+            <label>Baslangic dugumu
+              <input name="start" required placeholder="orn. A">
+            </label>
+            <button type="submit">Calistir</button>
+          </form>
+          <pre id="algo-result" class="output" aria-live="polite">Sonuclar burada gorunecek</pre>
+        </section>
+
+        <section class="card">
+          <div class="section-heading">
+            <h2>Graf ozeti</h2>
+            <button id="reset-graph" type="button" class="ghost">Temizle</button>
           </div>
-        </div>
-      </section>
+          <div class="summary-grid">
+            <div>
+              <h3>Dugumler</h3>
+              <ul id="node-list" class="list"></ul>
+            </div>
+            <div>
+              <h3>Kenarlar</h3>
+              <ul id="edge-list" class="list"></ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="card file-card">
+          <div class="section-heading">
+            <h2>Dosya yukle</h2>
+            <span class="muted">CSV / Excel</span>
+          </div>
+          <form id="file-form" class="stack">
+            <input id="file-input" type="file" accept=".csv,.xls,.xlsx" />
+            <button type="submit">Yukle</button>
+          </form>
+          <p id="file-status" class="muted tiny">Henuz dosya secilmedi</p>
+        </section>
+      </div>
     </aside>
 
     <main class="graph-area">
