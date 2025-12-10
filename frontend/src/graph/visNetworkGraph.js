@@ -19,7 +19,7 @@
       edges: {
         arrows: { to: { enabled: true, scaleFactor: 0.7 } },
         color: { color: "#38bdf8", highlight: "#22c55e" },
-        font: { color: "#e2e8f0", align: "top" },
+        font: { color: "#0b1220", size: 12, face: "Arial", strokeWidth: 0, align: "top" },
         smooth: { type: "dynamic" },
       },
       physics: {
@@ -38,12 +38,16 @@
     graph.nodes.forEach((label, id) => {
       nodes.add({ id, label: `${id}\n${label}` });
     });
-    graph.edges.forEach(({ from, to, weight }) => {
+    graph.edges.forEach(({ from, to, weight, relationType }) => {
+      const edgeLabel =
+        relationType && weight !== null
+          ? `${relationType} (${weight})`
+          : relationType || (weight !== null ? String(weight) : "");
       edges.add({
         id: `e-${edgeCounter++}`,
         from,
         to,
-        label: weight === null ? "" : String(weight),
+        label: edgeLabel,
       });
     });
   };
