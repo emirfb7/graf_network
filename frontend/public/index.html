@@ -84,21 +84,28 @@
           </section>
 
           <section class="card">
-            <div class="section-heading">
-              <h2>Graf ozeti</h2>
-              <button id="reset-graph" type="button" class="ghost">Temizle</button>
+        <div class="section-heading">
+          <h2>Graf ozeti</h2>
+          <button id="reset-graph" type="button" class="ghost">Temizle</button>
+        </div>
+        <div id="selected-row" class="selected-row hidden" aria-live="polite">
+          <div class="selected-info">
+            <span class="badge">Secili</span>
+            <div id="selected-label" class="selected-label"></div>
+          </div>
+          <button id="delete-selected" type="button" class="danger">Sil</button>
+        </div>
+        <div class="summary-grid">
+          <div>
+            <h3>Dugumler</h3>
+            <ul id="node-list" class="list"></ul>
+          </div>
+            <div>
+              <h3>Kenarlar</h3>
+              <ul id="edge-list" class="list"></ul>
             </div>
-            <div class="summary-grid">
-              <div>
-                <h3>Dugumler</h3>
-                <ul id="node-list" class="list"></ul>
-              </div>
-              <div>
-                <h3>Kenarlar</h3>
-                <ul id="edge-list" class="list"></ul>
-              </div>
-            </div>
-          </section>
+          </div>
+        </section>
         </div>
 
         <section class="card file-card">

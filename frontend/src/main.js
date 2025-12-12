@@ -21,10 +21,14 @@ class Graph {
     if (!this.nodes.has(a) || !this.nodes.has(b)) {
       throw new Error("Once dugumleri ekleyin (kaynak/hedef yok)");
     }
+    const key = this.#edgeKey(a, b);
+    if (this.edges.some((e) => e.key === key)) {
+      throw new Error("Bu kenar zaten var");
+    }
     this.adj.get(a).add(b);
     this.adj.get(b).add(a);
     const parsed = this.#parseWeight(weight);
-    this.edges.push({ from: a, to: b, weight: parsed, relationType });
+    this.edges.push({ from: a, to: b, weight: parsed, relationType, key });
   }
 
   #parseWeight(value) {
@@ -32,6 +36,10 @@ class Graph {
     const num = Number(value);
     if (Number.isFinite(num)) return num;
     return null;
+  }
+
+  #edgeKey(a, b) {
+    return [a, b].sort().join("|");
   }
 
   bfs(start) {
@@ -72,6 +80,28 @@ class Graph {
     return order;
   }
 
+  removeNode(id) {
+    const key = id.trim();
+    if (!this.nodes.has(key)) throw new Error("Bu dugum yok");
+    this.nodes.delete(key);
+    this.adj.delete(key);
+    for (const set of this.adj.values()) {
+      set.delete(key);
+    }
+    this.edges = this.edges.filter((e) => e.from !== key && e.to !== key);
+  }
+
+  removeEdge(from, to) {
+    const key = this.#edgeKey(from.trim(), to.trim());
+    const before = this.edges.length;
+    this.edges = this.edges.filter((e) => e.key !== key);
+    const aSet = this.adj.get(from);
+    const bSet = this.adj.get(to);
+    if (aSet) aSet.delete(to);
+    if (bSet) bSet.delete(from);
+    if (before === this.edges.length) throw new Error("Bu kenar yok");
+  }
+
   reset() {
     this.nodes.clear();
     this.edges = [];
@@ -98,8 +128,12 @@ const fileList = document.getElementById("file-list");
 const mergeBtn = document.getElementById("merge-files");
 const quickToggle = document.getElementById("quick-toggle");
 const quickPanel = document.getElementById("quick-panel");
+const selectedRow = document.getElementById("selected-row");
+const selectedLabel = document.getElementById("selected-label");
+const deleteSelectedBtn = document.getElementById("delete-selected");
 const uploadedFiles = [];
 const selectedFileOrder = [];
+let selectedItem = null;
 
 function renderNodes() {
   nodeList.innerHTML = "";
@@ -141,6 +175,23 @@ function setResult(text, isError = false) {
   algoResult.style.borderColor = isError ? "#f87171" : "var(--border)";
 }
 
+function updateSelectedUI(item) {
+  selectedItem = item;
+  if (!item) {
+    selectedRow.classList.add("hidden");
+    selectedLabel.textContent = "";
+    return;
+  }
+  selectedRow.classList.remove("hidden");
+  if (item.type === "node") {
+    selectedLabel.textContent = `Dugum: ${item.id}`;
+  } else {
+    const rel = item.relationType ? ` [${item.relationType}]` : "";
+    const w = item.weight !== null && item.weight !== undefined ? ` (w=${item.weight})` : "";
+    selectedLabel.textContent = `Kenar: ${item.from} -> ${item.to}${w}${rel}`;
+  }
+}
+
 function toggleSidebar() {
   const collapsed = sidebar.classList.toggle("collapsed");
   toggleSidebarBtn.textContent = collapsed ? "Open sidebar" : "Close sidebar";
@@ -152,7 +203,7 @@ function toggleQuickPanel() {
   if (isHidden) {
     quickPanel.removeAttribute("hidden");
     quickToggle.setAttribute("aria-expanded", "true");
-    quickToggle.querySelector(".chevron").textContent = "−";
+    quickToggle.querySelector(".chevron").textContent = "-";
   } else {
     quickPanel.setAttribute("hidden", "");
     quickToggle.setAttribute("aria-expanded", "false");
@@ -181,6 +232,7 @@ function renderFileList() {
 
 toggleSidebarBtn.addEventListener("click", toggleSidebar);
 quickToggle.addEventListener("click", toggleQuickPanel);
+renderer.onSelect((item) => updateSelectedUI(item));
 
 nodeForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -231,8 +283,10 @@ algoForm.addEventListener("submit", (e) => {
 resetBtn.addEventListener("click", () => {
   graph.reset();
   renderer.reset();
+  renderer.clearSelection();
   refreshView();
   setResult("Graf temizlendi");
+  updateSelectedUI(null);
 });
 
 fileForm.addEventListener("submit", (e) => {
@@ -264,8 +318,9 @@ fileList.addEventListener("click", async (e) => {
   try {
     fileStatus.textContent = `Okunuyor: ${fileObj.name}`;
     await loadGraphFromFile(fileObj.file);
-    setResult(`Dosyadan yüklendi: ${fileObj.name}`);
-    fileStatus.textContent = `Yüklendi: ${fileObj.name}`;
+    setResult(`Dosyadan yuklendi: ${fileObj.name}`);
+    fileStatus.textContent = `Yuklendi: ${fileObj.name}`;
+    updateSelectedUI(null);
   } catch (err) {
     fileStatus.textContent = err.message || "Dosya okunamadi";
     setResult(err.message || "Dosya okunamadi", true);
@@ -289,6 +344,7 @@ mergeBtn.addEventListener("click", async () => {
     loadGraphData(merged.nodesMap, merged.edges);
     setResult(`Merge tamamlandi: ${base.name} + ${other.name}`);
     fileStatus.textContent = "Merge tamam";
+    updateSelectedUI(null);
   } catch (err) {
     setResult(err.message || "Merge hatasi", true);
     fileStatus.textContent = err.message || "Merge hatasi";
@@ -357,6 +413,7 @@ function loadGraphData(nodesMap, edges) {
     }
   });
   refreshView();
+  updateSelectedUI(null);
 }
 
 function toggleFileSelection(idx, element) {
@@ -367,7 +424,7 @@ function toggleFileSelection(idx, element) {
     selectedFileOrder.push(idx);
     if (selectedFileOrder.length > 2) {
       const removed = selectedFileOrder.shift();
-      const toUnselect = fileList.querySelector(`[data-index=\"${removed}\"]`);
+      const toUnselect = fileList.querySelector(`[data-index="${removed}"]`);
       if (toUnselect) toUnselect.classList.remove("selected");
     }
   }
@@ -409,6 +466,23 @@ async function mergeFiles(baseFile, otherFile) {
 
   return { nodesMap, edges };
 }
+
+deleteSelectedBtn.addEventListener("click", () => {
+  if (!selectedItem) return;
+  try {
+    if (selectedItem.type === "node") {
+      graph.removeNode(selectedItem.id);
+    } else {
+      graph.removeEdge(selectedItem.from, selectedItem.to);
+    }
+    renderer.clearSelection();
+    refreshView();
+    updateSelectedUI(null);
+    setResult("Silindi");
+  } catch (err) {
+    setResult(err.message || "Silme hatasi", true);
+  }
+});
 
 refreshView();
 renderFileList();
