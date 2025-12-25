@@ -1,4 +1,4 @@
-const API_BASE =
+export const API_BASE =
   window.__API_BASE__ || "http://127.0.0.1:8000/api/v1";
 
 async function request(path, options = {}) {
@@ -21,4 +21,23 @@ export async function runAlgorithm(algorithm, payload) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function listGraphs() {
+  return request("/graphs");
+}
+
+export async function saveGraph(name, graph) {
+  return request("/graphs", {
+    method: "POST",
+    body: JSON.stringify({ name, graph }),
+  });
+}
+
+export async function loadGraph(graphId) {
+  return request(`/graphs/${graphId}`);
+}
+
+export function getGraphExportUrl(graphId) {
+  return `${API_BASE}/graphs/${graphId}/export`;
 }

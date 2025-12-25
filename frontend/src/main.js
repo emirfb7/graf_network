@@ -1,5 +1,6 @@
 ﻿import { createVisRenderer } from "./graph/visNetworkGraph.js";
 import { runAlgorithm } from "./api/client.js";
+import { getGraphExportUrl, listGraphs, loadGraph, saveGraph } from "./api/client.js";
 
 class Graph {
   constructor() {
@@ -105,6 +106,10 @@ const fileInput = document.getElementById("file-input");
 const fileStatus = document.getElementById("file-status");
 const fileList = document.getElementById("file-list");
 const mergeBtn = document.getElementById("merge-files");
+const saveForm = document.getElementById("save-form");
+const saveNameInput = document.getElementById("save-name");
+const refreshSavesBtn = document.getElementById("refresh-saves");
+const savedList = document.getElementById("saved-list");
 const quickToggle = document.getElementById("quick-toggle");
 const quickPanel = document.getElementById("quick-panel");
 const selectedRow = document.getElementById("selected-row");
@@ -121,6 +126,7 @@ const deleteNodeInfoBtn = document.getElementById("delete-node-info");
 const uploadedFiles = [];
 const selectedFileOrder = [];
 let selectedItem = null;
+let savedGraphs = [];
 const algoColors = { bfs: "#22c55e", dfs: "#f59e0b" };
 const simColors = {
   current: "#facc15",
@@ -558,6 +564,110 @@ function updateNodeInfo(nodeId) {
   deleteNodeInfoBtn.disabled = false;
 }
 
+function toSafeFilename(value, fallback) {
+  const trimmed = (value || "").trim() || fallback;
+  const cleaned = trimmed.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+  return cleaned || fallback;
+}
+
+function buildGraphPayloadForSave() {
+  const nodes = Array.from(graph.nodes.entries()).map(([id, label]) => ({
+    id,
+    label,
+  }));
+  const edges = graph.edges.map((edge) => ({
+    from: edge.from,
+    to: edge.to,
+    relation_type: edge.relationType || "",
+    relation_degree: edge.weight ?? null,
+  }));
+  return { nodes, edges };
+}
+
+function renderSavedList(records) {
+  if (!savedList) return;
+  savedList.innerHTML = "";
+  if (!records.length) {
+    const li = document.createElement("li");
+    li.className = "muted";
+    li.textContent = "Henuz kayit yok";
+    savedList.appendChild(li);
+    return;
+  }
+  records.forEach((record) => {
+    const li = document.createElement("li");
+    li.className = "saved-item";
+    const meta = document.createElement("div");
+    meta.className = "saved-meta";
+    const name = document.createElement("strong");
+    name.textContent = record.name || record.id;
+    const info = document.createElement("span");
+    info.className = "muted tiny";
+    const nodeCount = record.node_count ?? 0;
+    const edgeCount = record.edge_count ?? 0;
+    info.textContent = `${nodeCount} dugum, ${edgeCount} kenar`;
+    meta.appendChild(name);
+    meta.appendChild(info);
+
+    const actions = document.createElement("div");
+    actions.className = "saved-actions";
+    const loadBtn = document.createElement("button");
+    loadBtn.type = "button";
+    loadBtn.className = "ghost tiny-btn";
+    loadBtn.textContent = "Yukle";
+    loadBtn.addEventListener("click", () => loadSavedGraph(record.id));
+
+    const exportLink = document.createElement("a");
+    exportLink.className = "ghost tiny-btn";
+    exportLink.textContent = "CSV";
+    exportLink.href = getGraphExportUrl(record.id);
+    exportLink.setAttribute("download", `${toSafeFilename(record.name, "graf")}.csv`);
+
+    actions.appendChild(loadBtn);
+    actions.appendChild(exportLink);
+    li.appendChild(meta);
+    li.appendChild(actions);
+    savedList.appendChild(li);
+  });
+}
+
+async function refreshSavedGraphs() {
+  if (!savedList) return;
+  try {
+    const records = await listGraphs();
+    savedGraphs = records;
+    renderSavedList(records);
+  } catch (err) {
+    savedList.innerHTML = "";
+    const li = document.createElement("li");
+    li.className = "muted";
+    li.textContent = "Kayitlar yuklenemedi";
+    savedList.appendChild(li);
+  }
+}
+
+async function loadSavedGraph(graphId) {
+  try {
+    stopSimulation(true);
+    const record = await loadGraph(graphId);
+    const payload = record.graph || {};
+    const nodesMap = new Map();
+    (payload.nodes || []).forEach((node) => {
+      nodesMap.set(node.id, node.label || node.id);
+    });
+    const edges = (payload.edges || []).map((edge) => ({
+      from: edge.from,
+      to: edge.to,
+      relationType: edge.relation_type || "",
+      weight: edge.relation_degree ?? null,
+    }));
+    loadGraphData(nodesMap, edges);
+    setResult(`Kayit yuklendi: ${record.name || record.id}`);
+  } catch (err) {
+    setResult(err.message || "Kayit yuklenemedi", true);
+  }
+}
+
 function renderFileList() {
   fileList.innerHTML = "";
   if (!uploadedFiles.length) {
@@ -593,6 +703,31 @@ if (simSpeedSelect)
   simSpeedSelect.addEventListener("change", () => {
     getSimSpeed();
     restartSimTimer();
+  });
+if (refreshSavesBtn) refreshSavesBtn.addEventListener("click", refreshSavedGraphs);
+if (saveForm)
+  saveForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!saveNameInput) return;
+    const name = (saveNameInput.value || "").trim();
+    if (!name) {
+      setResult("Kayit adi bos olamaz", true);
+      return;
+    }
+    if (!graph.nodes.size) {
+      setResult("Graf bos, kaydedilemez", true);
+      return;
+    }
+    try {
+      stopSimulation(true);
+      const payload = buildGraphPayloadForSave();
+      const record = await saveGraph(name, payload);
+      setResult(`Kaydedildi: ${record.name}`);
+      saveNameInput.value = "";
+      await refreshSavedGraphs();
+    } catch (err) {
+      setResult(err.message || "Kayit hatasi", true);
+    }
   });
 
 nodeForm.addEventListener("submit", (e) => {
@@ -894,3 +1029,4 @@ deleteNodeInfoBtn.addEventListener("click", () => {
 
 refreshView();
 renderFileList();
+refreshSavedGraphs();

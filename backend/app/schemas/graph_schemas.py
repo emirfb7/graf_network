@@ -11,6 +11,8 @@ class GraphNode(BaseModel):
 class GraphEdge(BaseModel):
     from_id: str = Field(..., alias="from")
     to_id: str = Field(..., alias="to")
+    relation_type: Optional[str] = None
+    relation_degree: Optional[float] = None
 
 
 class GraphPayload(BaseModel):
@@ -25,3 +27,23 @@ class AlgorithmRequest(BaseModel):
 
 class AlgorithmResponse(BaseModel):
     order: List[str]
+
+
+class GraphSaveRequest(BaseModel):
+    name: str
+    graph: GraphPayload
+
+
+class GraphRecord(BaseModel):
+    id: str
+    name: str
+    created_at: str
+    graph: GraphPayload
+
+
+class GraphRecordSummary(BaseModel):
+    id: str
+    name: str
+    created_at: str
+    node_count: int
+    edge_count: int
