@@ -8,6 +8,10 @@ export function createVisRenderer(container) {
   const edges = visAvailable ? new vis.DataSet() : null;
   let edgeCounter = 0;
   let selectHandler = null;
+  let baseNodeColor = { background: "#0ea5e9", border: "#38bdf8" };
+  let baseNodeFont = { color: "#e2e8f0" };
+  let baseEdgeColor = { color: "#38bdf8", highlight: "#22c55e", hover: "#22c55e" };
+  let baseEdgeWidth = 2;
 
   let network = null;
   if (visAvailable && container) {
@@ -17,14 +21,14 @@ export function createVisRenderer(container) {
       nodes: {
         shape: "dot",
         size: 14,
-        color: { background: "#0ea5e9", border: "#38bdf8" },
-        font: { color: "#e2e8f0" },
+        color: baseNodeColor,
+        font: baseNodeFont,
         borderWidth: 2,
       },
       edges: {
-        arrows: { to: { enabled: true, scaleFactor: 0.7 } },
-        color: { color: "#38bdf8", highlight: "#22c55e" },
-        font: { color: "#0b1220", size: 12, face: "Arial", strokeWidth: 0, align: "top" },
+        arrows: { to: { enabled: false } },
+        color: baseEdgeColor,
+        font: { color: "#e2e8f0", size: 12, face: "Arial", strokeWidth: 0, align: "top" },
         smooth: { type: "dynamic" },
       },
       physics: {
@@ -104,5 +108,92 @@ export function createVisRenderer(container) {
     if (selectHandler) selectHandler(null);
   };
 
-  return { sync, reset, onSelect, clearSelection };
+  const clearHighlights = () => {
+    if (!nodes) return;
+    const updates = nodes.get().map((n) => ({
+      id: n.id,
+      color: { ...baseNodeColor },
+      font: { ...baseNodeFont },
+    }));
+    if (updates.length) nodes.update(updates);
+    clearEdgeHighlights();
+  };
+
+  const highlightNodes = (ids, color) => {
+    if (!nodes) return;
+    clearHighlights();
+    const updates = ids.map((id) => ({
+      id,
+      color: { background: color, border: color },
+      font: { ...baseNodeFont },
+    }));
+    if (updates.length) nodes.update(updates);
+  };
+
+  const highlightSimulation = ({
+    visitedIds = [],
+    currentId = null,
+    visitedColor = "#22c55e",
+    currentColor = "#facc15",
+  }) => {
+    if (!nodes) return;
+    const visitedSet = new Set(visitedIds);
+    const updates = nodes.get().map((n) => {
+      let color = { ...baseNodeColor };
+      let font = { ...baseNodeFont };
+      if (visitedSet.has(n.id)) {
+        color = { background: visitedColor, border: visitedColor };
+        font = { ...baseNodeFont };
+      }
+      if (currentId && n.id === currentId) {
+        color = { background: currentColor, border: currentColor };
+        font = { ...baseNodeFont };
+      }
+      return { id: n.id, color, font };
+    });
+    if (updates.length) nodes.update(updates);
+  };
+
+  const clearEdgeHighlights = () => {
+    if (!edges) return;
+    const updates = edges.get().map((e) => ({
+      id: e.id,
+      color: { ...baseEdgeColor },
+      width: baseEdgeWidth,
+    }));
+    if (updates.length) edges.update(updates);
+  };
+
+  const highlightEdge = (from, to, color = "#f97316") => {
+    if (!edges) return;
+    const key = buildEdgeKey(from, to);
+    let targetId = null;
+    const direct = edges.get(key);
+    if (direct) {
+      targetId = direct.id;
+    } else {
+      const fallback = edges
+        .get()
+        .find((e) => (e.from === from && e.to === to) || (e.from === to && e.to === from));
+      if (fallback) targetId = fallback.id;
+    }
+    if (!targetId) return;
+    edges.update({
+      id: targetId,
+      color: { color, highlight: color, hover: color },
+      width: baseEdgeWidth + 2,
+    });
+  };
+
+  return {
+    sync,
+    reset,
+    onSelect,
+    clearSelection,
+    highlightNodes,
+    clearHighlights,
+    clearEdgeHighlights,
+    highlightEdge,
+    highlightSimulation,
+  };
 }

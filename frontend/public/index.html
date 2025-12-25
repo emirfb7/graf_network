@@ -37,6 +37,27 @@
         </button>
 
         <div id="quick-panel" class="accordion-panel" hidden>
+          <section class="card node-info-card">
+            <button id="node-info-toggle" class="accordion-toggle inner-toggle" aria-expanded="true" type="button">
+              Secili Dugum
+              <span class="chevron" aria-hidden="true">−</span>
+            </button>
+            <div id="node-info-panel" class="node-info-panel">
+              <div class="selected-row inline">
+                <div class="selected-info">
+                  <span class="badge">Secili</span>
+                  <div id="node-info-label" class="selected-label">Dugum secilmedi</div>
+                </div>
+                <button id="delete-node-info" type="button" class="danger tiny-btn">Sil</button>
+              </div>
+              <div class="node-info-list">
+                <div class="info-item"><span>ID</span><strong id="node-info-id">-</strong></div>
+                <div class="info-item"><span>Etiket</span><strong id="node-info-name">-</strong></div>
+                <div class="info-item"><span>Baglanti</span><strong id="node-info-degree">-</strong></div>
+                <div class="info-item"><span>Komsular</span><strong id="node-info-neighbors">-</strong></div>
+              </div>
+            </div>
+          </section>
           <section class="card">
             <h2>Dugum ekle</h2>
             <form id="node-form" class="stack">
@@ -67,20 +88,60 @@
           </section>
 
           <section class="card">
-            <h2>Algoritma calistir</h2>
-            <form id="algo-form" class="stack">
-              <label>Algoritma
-                <select name="algorithm">
-                  <option value="bfs">BFS</option>
-                  <option value="dfs">DFS</option>
+          <h2>Algoritma calistir</h2>
+          <form id="algo-form" class="stack">
+            <label>Algoritma
+              <select name="algorithm" id="algorithm-select" class="algo-select">
+                <option value="bfs">BFS</option>
+                <option value="dfs">DFS</option>
+              </select>
+            </label>
+            <div class="legend">
+              <span class="legend-item"><span class="dot dot-bfs"></span>BFS</span>
+              <span class="legend-item"><span class="dot dot-dfs"></span>DFS</span>
+            </div>
+            <label>Baslangic dugumu
+              <input name="start" required placeholder="orn. A">
+            </label>
+            <div class="algo-actions">
+              <button type="submit">Calistir</button>
+              <button type="button" id="sim-toggle" class="ghost">Simulasyon baslat</button>
+              <button type="button" id="sim-reset" class="ghost">Sifirla</button>
+              <label class="sim-speed">Hiz
+                <select id="sim-speed" name="sim-speed">
+                  <option value="1">1x</option>
+                  <option value="1.25">1.25x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2">2x</option>
                 </select>
               </label>
-              <label>Baslangic dugumu
-                <input name="start" required placeholder="orn. A">
-              </label>
-              <button type="submit">Calistir</button>
-            </form>
+            </div>
+          </form>
             <pre id="algo-result" class="output" aria-live="polite">Sonuclar burada gorunecek</pre>
+            <div class="simulation-panel">
+              <div class="section-heading">
+                <h3>Simulasyon durumu</h3>
+                <span id="sim-status" class="muted tiny">Hazir</span>
+              </div>
+              <div class="sim-grid">
+                <div>
+                  <div class="sim-label" id="sim-frontier-label">Kuyruk</div>
+                  <div id="sim-frontier" class="sim-box">-</div>
+                </div>
+                <div>
+                  <div class="sim-label">Mevcut dugum</div>
+                  <div id="sim-current" class="sim-box">-</div>
+                </div>
+                <div>
+                  <div class="sim-label">Ziyaret edilen</div>
+                  <div id="sim-visited" class="sim-box">-</div>
+                </div>
+                <div>
+                  <div class="sim-label">Kenar gecisi</div>
+                  <div id="sim-edge" class="sim-box">-</div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section class="card">

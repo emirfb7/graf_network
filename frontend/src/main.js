@@ -1,4 +1,5 @@
-﻿import { createVisRenderer } from "./graph/visNetworkGraph.js";
+import { createVisRenderer } from "./graph/visNetworkGraph.js";
+import { runAlgorithm } from "./api/client.js";
 
 class Graph {
   constructor() {
@@ -42,6 +43,11 @@ class Graph {
     return [a, b].sort().join("|");
   }
 
+  getNeighborsSorted(id, reverse = false) {
+    const neighbors = Array.from(this.adj.get(id) || []).sort();
+    return reverse ? neighbors.reverse() : neighbors;
+  }
+
   bfs(start) {
     const s = start.trim();
     if (!this.nodes.has(s)) throw new Error("Baslangic dugumu yok");
@@ -51,7 +57,7 @@ class Graph {
     while (queue.length) {
       const node = queue.shift();
       order.push(node);
-      for (const n of this.adj.get(node) || []) {
+      for (const n of this.getNeighborsSorted(node)) {
         if (!visited.has(n)) {
           visited.add(n);
           queue.push(n);
@@ -72,7 +78,7 @@ class Graph {
       if (visited.has(node)) continue;
       visited.add(node);
       order.push(node);
-      const neighbors = Array.from(this.adj.get(node) || []).reverse();
+      const neighbors = this.getNeighborsSorted(node, true);
       for (const n of neighbors) {
         if (!visited.has(n)) stack.push(n);
       }
@@ -118,6 +124,17 @@ const algoForm = document.getElementById("algo-form");
 const nodeList = document.getElementById("node-list");
 const edgeList = document.getElementById("edge-list");
 const algoResult = document.getElementById("algo-result");
+const startInput = algoForm.querySelector("input[name=\"start\"]");
+const algoSelect = document.getElementById("algorithm-select");
+const simToggleBtn = document.getElementById("sim-toggle");
+const simResetBtn = document.getElementById("sim-reset");
+const simSpeedSelect = document.getElementById("sim-speed");
+const simStatus = document.getElementById("sim-status");
+const simFrontierLabel = document.getElementById("sim-frontier-label");
+const simFrontier = document.getElementById("sim-frontier");
+const simCurrent = document.getElementById("sim-current");
+const simVisited = document.getElementById("sim-visited");
+const simEdge = document.getElementById("sim-edge");
 const resetBtn = document.getElementById("reset-graph");
 const sidebar = document.getElementById("sidebar");
 const toggleSidebarBtn = document.getElementById("toggle-sidebar");
@@ -134,6 +151,22 @@ const deleteSelectedBtn = document.getElementById("delete-selected");
 const uploadedFiles = [];
 const selectedFileOrder = [];
 let selectedItem = null;
+const algoColors = { bfs: "#22c55e", dfs: "#f59e0b" };
+const simColors = {
+  current: "#facc15",
+  edge: "#f97316",
+  edgeSkip: "#64748b",
+};
+const SIM_BASE_INTERVAL = 1000;
+const simState = {
+  running: false,
+  paused: false,
+  timerId: null,
+  steps: [],
+  stepIndex: 0,
+  algorithm: null,
+  speed: 1,
+};
 
 function renderNodes() {
   nodeList.innerHTML = "";
@@ -159,7 +192,7 @@ function renderEdges() {
     const li = document.createElement("li");
     const w = weight === null ? "" : ` (w=${weight})`;
     const rel = relationType ? ` [${relationType}]` : "";
-    li.textContent = `${from} -> ${to}${w}${rel}`;
+    li.textContent = `${formatEdge(from, to)}${w}${rel}`;
     edgeList.appendChild(li);
   });
 }
@@ -175,6 +208,322 @@ function setResult(text, isError = false) {
   algoResult.style.borderColor = isError ? "#f87171" : "var(--border)";
 }
 
+function renderAlgoResult(order, algorithm, activeIndex = null, emptyMessage = "Hic dugum yok") {
+  const color = algoColors[algorithm] || "#38bdf8";
+  if (!order.length) {
+    algoResult.textContent = emptyMessage;
+    return;
+  }
+  const rows = order
+    .map((nodeId, idx) => {
+      const isActive = activeIndex === idx;
+      const rowClass = isActive ? "row active" : "row";
+      const rowStyle = isActive
+        ? ` style="border-left: 3px solid ${color}; background: ${color}22;"`
+        : "";
+      return `<div class="${rowClass}"${rowStyle}><span>${idx + 1}</span><span>${nodeId}</span></div>`;
+    })
+    .join("");
+  algoResult.innerHTML = `<div class="algo-head" style="color:${color}">${algorithm.toUpperCase()} sonucu</div>${rows}`;
+  algoResult.style.borderColor = "var(--border)";
+}
+
+function updateAlgoSelectColor() {
+  const algo = algoSelect.value;
+  const color = algoColors[algo] || "#22c55e";
+  algoSelect.style.setProperty("--algo-color", color);
+}
+
+function setSimStatus(text) {
+  if (simStatus) simStatus.textContent = text;
+}
+
+function updateSimToggleLabel() {
+  if (!simToggleBtn) return;
+  if (!simState.running) {
+    simToggleBtn.textContent = "Simulasyon baslat";
+    return;
+  }
+  simToggleBtn.textContent = simState.paused ? "Devam et" : "Duraklat";
+}
+
+function resetSimPanel() {
+  if (simFrontier) simFrontier.textContent = "-";
+  if (simCurrent) simCurrent.textContent = "-";
+  if (simVisited) simVisited.textContent = "-";
+  if (simEdge) simEdge.textContent = "-";
+  setSimStatus("Hazir");
+}
+
+function getSimSpeed() {
+  const value = Number(simSpeedSelect?.value || 1);
+  const speed = Number.isFinite(value) && value > 0 ? value : 1;
+  simState.speed = speed;
+  return speed;
+}
+
+function getSimInterval() {
+  const speed = getSimSpeed();
+  return Math.max(120, Math.round(SIM_BASE_INTERVAL / speed));
+}
+
+function clearSimTimer() {
+  if (!simState.timerId) return;
+  clearInterval(simState.timerId);
+  simState.timerId = null;
+}
+
+function startSimTimer() {
+  clearSimTimer();
+  simState.timerId = setInterval(() => {
+    advanceSimulation();
+  }, getSimInterval());
+}
+
+function restartSimTimer() {
+  if (!simState.running || simState.paused) return;
+  startSimTimer();
+}
+
+function updateSimFrontierLabel(algorithm) {
+  if (!simFrontierLabel) return;
+  simFrontierLabel.textContent = algorithm === "dfs" ? "Yigin" : "Kuyruk";
+}
+
+function validateStartId() {
+  const startId = (startInput.value || "").trim();
+  if (!startId) throw new Error("Baslangic dugumu bos olamaz");
+  if (!graph.nodes.has(startId)) throw new Error("Baslangic dugumu yok");
+  return startId;
+}
+
+function createStep({
+  type,
+  current = null,
+  edge = null,
+  discovered = null,
+  queue = null,
+  stack = null,
+  visited = null,
+  order = null,
+}) {
+  return {
+    type,
+    current,
+    edge,
+    discovered,
+    queue: queue ? [...queue] : null,
+    stack: stack ? [...stack] : null,
+    visited: visited ? Array.from(visited) : [],
+    order: order ? [...order] : [],
+  };
+}
+
+function buildSimulationSteps(algorithm, startId) {
+  if (!graph.nodes.size) throw new Error("Hic dugum yok");
+  if (algorithm === "bfs") return buildBfsSteps(startId);
+  if (algorithm === "dfs") return buildDfsSteps(startId);
+  throw new Error("Algoritma secimi hatali");
+}
+
+function buildBfsSteps(startId) {
+  const steps = [];
+  const visited = new Set();
+  const order = [];
+  const queue = [];
+
+  queue.push(startId);
+  visited.add(startId);
+  steps.push(createStep({ type: "init", queue, visited, order }));
+
+  while (queue.length) {
+    const current = queue.shift();
+    order.push(current);
+    steps.push(createStep({ type: "visit", current, queue, visited, order }));
+    const neighbors = graph.getNeighborsSorted(current);
+    for (const neighbor of neighbors) {
+      const edge = { from: current, to: neighbor };
+      const discovered = !visited.has(neighbor);
+      if (discovered) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+      steps.push(
+        createStep({
+          type: "edge",
+          current,
+          edge,
+          discovered,
+          queue,
+          visited,
+          order,
+        })
+      );
+    }
+  }
+
+  return steps;
+}
+
+function buildDfsSteps(startId) {
+  const steps = [];
+  const visited = new Set();
+  const order = [];
+  const stack = [startId];
+
+  steps.push(createStep({ type: "init", stack, visited, order }));
+
+  while (stack.length) {
+    const current = stack.pop();
+    if (visited.has(current)) {
+      steps.push(createStep({ type: "skip", current, stack, visited, order }));
+      continue;
+    }
+    visited.add(current);
+    order.push(current);
+    steps.push(createStep({ type: "visit", current, stack, visited, order }));
+    const neighbors = graph.getNeighborsSorted(current, true);
+    for (const neighbor of neighbors) {
+      const edge = { from: current, to: neighbor };
+      const discovered = !visited.has(neighbor);
+      if (discovered) stack.push(neighbor);
+      steps.push(
+        createStep({
+          type: "edge",
+          current,
+          edge,
+          discovered,
+          stack,
+          visited,
+          order,
+        })
+      );
+    }
+  }
+
+  return steps;
+}
+
+function renderSimulationStep(step) {
+  const algorithm = simState.algorithm || algoSelect.value;
+  const algoColor = algoColors[algorithm] || "#38bdf8";
+  const frontier = step.queue ?? step.stack ?? [];
+  const frontierText = frontier.length ? frontier.join(", ") : "-";
+  const visitedText = step.visited.length ? step.visited.join(", ") : "-";
+
+  if (simFrontier) simFrontier.textContent = frontierText;
+  if (simCurrent) simCurrent.textContent = step.current || "-";
+  if (simVisited) simVisited.textContent = visitedText;
+
+  if (simEdge) {
+    if (step.edge) {
+      const action = step.discovered ? "ekle" : "atla";
+      simEdge.textContent = `${step.edge.from} -> ${step.edge.to} (${action})`;
+    } else {
+      simEdge.textContent = "-";
+    }
+  }
+
+  const activeIndex = step.current && step.order.length ? step.order.length - 1 : null;
+  renderAlgoResult(step.order, algorithm, activeIndex, "Henuz ziyaret yok");
+  renderer.highlightSimulation({
+    visitedIds: step.visited,
+    currentId: step.current,
+    visitedColor: algoColor,
+    currentColor: simColors.current,
+  });
+  renderer.clearEdgeHighlights();
+  if (step.edge) {
+    const edgeColor = step.discovered ? simColors.edge : simColors.edgeSkip;
+    renderer.highlightEdge(step.edge.from, step.edge.to, edgeColor);
+  }
+}
+
+function startSimulation() {
+  try {
+    stopSimulation(true);
+    const algorithm = algoSelect.value;
+    const startId = validateStartId();
+    const steps = buildSimulationSteps(algorithm, startId);
+    if (!steps.length) {
+      setResult("Hic dugum yok", true);
+      return;
+    }
+    simState.steps = steps;
+    simState.stepIndex = 0;
+    simState.algorithm = algorithm;
+    simState.running = true;
+    simState.paused = false;
+    updateSimFrontierLabel(algorithm);
+    renderSimulationStep(steps[0]);
+    setSimStatus(`Calisiyor - Adim 1/${steps.length}`);
+    updateSimToggleLabel();
+    startSimTimer();
+  } catch (err) {
+    setResult(err.message || "Simulasyon hatasi", true);
+    setSimStatus("Hata");
+    updateSimToggleLabel();
+  }
+}
+
+function pauseSimulation() {
+  simState.paused = true;
+  clearSimTimer();
+  setSimStatus(`Duraklatildi - Adim ${simState.stepIndex + 1}/${simState.steps.length}`);
+  updateSimToggleLabel();
+}
+
+function resumeSimulation() {
+  simState.paused = false;
+  setSimStatus(`Calisiyor - Adim ${simState.stepIndex + 1}/${simState.steps.length}`);
+  updateSimToggleLabel();
+  startSimTimer();
+}
+
+function finishSimulation() {
+  clearSimTimer();
+  simState.running = false;
+  simState.paused = false;
+  updateSimToggleLabel();
+  setSimStatus("Bitti");
+}
+
+function advanceSimulation() {
+  if (!simState.running || simState.paused) return;
+  const nextIndex = simState.stepIndex + 1;
+  if (nextIndex >= simState.steps.length) {
+    finishSimulation();
+    return;
+  }
+  simState.stepIndex = nextIndex;
+  renderSimulationStep(simState.steps[simState.stepIndex]);
+  setSimStatus(`Calisiyor - Adim ${simState.stepIndex + 1}/${simState.steps.length}`);
+}
+
+function toggleSimulation() {
+  if (!simState.running) {
+    startSimulation();
+    return;
+  }
+  if (simState.paused) {
+    resumeSimulation();
+  } else {
+    pauseSimulation();
+  }
+}
+
+function stopSimulation(resetHighlights = false) {
+  clearSimTimer();
+  simState.running = false;
+  simState.paused = false;
+  simState.steps = [];
+  simState.stepIndex = 0;
+  simState.algorithm = null;
+  updateSimToggleLabel();
+  resetSimPanel();
+  if (resetHighlights) renderer.clearHighlights();
+}
+
 function updateSelectedUI(item) {
   selectedItem = item;
   if (!item) {
@@ -185,10 +534,11 @@ function updateSelectedUI(item) {
   selectedRow.classList.remove("hidden");
   if (item.type === "node") {
     selectedLabel.textContent = `Dugum: ${item.id}`;
+    startInput.value = item.id;
   } else {
     const rel = item.relationType ? ` [${item.relationType}]` : "";
     const w = item.weight !== null && item.weight !== undefined ? ` (w=${item.weight})` : "";
-    selectedLabel.textContent = `Kenar: ${item.from} -> ${item.to}${w}${rel}`;
+    selectedLabel.textContent = `Kenar: ${formatEdge(item.from, item.to)}${w}${rel}`;
   }
 }
 
@@ -233,6 +583,17 @@ function renderFileList() {
 toggleSidebarBtn.addEventListener("click", toggleSidebar);
 quickToggle.addEventListener("click", toggleQuickPanel);
 renderer.onSelect((item) => updateSelectedUI(item));
+algoSelect.addEventListener("change", () => {
+  stopSimulation(true);
+  updateAlgoSelectColor();
+});
+simToggleBtn.addEventListener("click", toggleSimulation);
+simResetBtn.addEventListener("click", () => stopSimulation(true));
+simSpeedSelect.addEventListener("change", () => {
+  getSimSpeed();
+  restartSimTimer();
+});
+updateAlgoSelectColor();
 
 nodeForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -240,6 +601,7 @@ nodeForm.addEventListener("submit", (e) => {
   const id = form.get("id") || "";
   const label = form.get("label") || "";
   try {
+    stopSimulation(true);
     graph.addNode(id, label);
     refreshView();
     setResult(`Dugum eklendi: ${id}`);
@@ -256,9 +618,10 @@ edgeForm.addEventListener("submit", (e) => {
   const to = form.get("to") || "";
   const weight = form.get("weight");
   try {
+    stopSimulation(true);
     graph.addEdge(from, to, weight === null ? null : weight);
     refreshView();
-    setResult(`Kenar eklendi: ${from} - ${to}`);
+    setResult(`Kenar eklendi: ${formatEdge(from, to)}`);
     edgeForm.reset();
   } catch (err) {
     setResult(err.message, true);
@@ -271,19 +634,27 @@ algoForm.addEventListener("submit", (e) => {
   const algorithm = form.get("algorithm");
   const start = form.get("start") || "";
   try {
-    let order = [];
-    if (algorithm === "bfs") order = graph.bfs(start);
-    else order = graph.dfs(start);
-    setResult(`${algorithm.toUpperCase()} sirasi: ${order.join(" -> ")}`);
+    stopSimulation(true);
+    const payload = buildAlgorithmPayload(start);
+    runAlgorithm(algorithm, payload)
+      .then((res) => {
+        renderAlgoResult(res.order, algorithm);
+        renderer.highlightNodes(res.order, algoColors[algorithm]);
+      })
+      .catch((err) => {
+        setResult(err.message, true);
+      });
   } catch (err) {
     setResult(err.message, true);
   }
 });
 
 resetBtn.addEventListener("click", () => {
+  stopSimulation(true);
   graph.reset();
   renderer.reset();
   renderer.clearSelection();
+  renderer.clearHighlights();
   refreshView();
   setResult("Graf temizlendi");
   updateSelectedUI(null);
@@ -397,6 +768,8 @@ function parseCsv(text) {
 }
 
 function loadGraphData(nodesMap, edges) {
+  stopSimulation(true);
+  renderer.clearHighlights();
   graph.reset();
   nodesMap.forEach((label, id) => {
     try {
@@ -435,6 +808,26 @@ function buildEdgeKey(a, b) {
   return [a, b].sort().join("|");
 }
 
+function formatEdge(a, b) {
+  const [x, y] = [a, b].sort();
+  return `${x} <-> ${y}`;
+}
+
+function buildAlgorithmPayload(startId) {
+  if (!startId.trim()) {
+    throw new Error("Baslangic dugumu bos olamaz");
+  }
+  const nodes = Array.from(graph.nodes.entries()).map(([id, label]) => ({
+    id,
+    label,
+  }));
+  const edges = graph.edges.map((e) => ({
+    from: e.from,
+    to: e.to,
+  }));
+  return { start_id: startId.trim(), graph: { nodes, edges } };
+}
+
 async function mergeFiles(baseFile, otherFile) {
   const [baseText, otherText] = await Promise.all([baseFile.text(), otherFile.text()]);
   const baseParsed = parseCsv(baseText);
@@ -470,6 +863,7 @@ async function mergeFiles(baseFile, otherFile) {
 deleteSelectedBtn.addEventListener("click", () => {
   if (!selectedItem) return;
   try {
+    stopSimulation(true);
     if (selectedItem.type === "node") {
       graph.removeNode(selectedItem.id);
     } else {

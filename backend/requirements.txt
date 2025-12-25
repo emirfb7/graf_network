@@ -1,1 +1,2 @@
-# Add backend dependencies here
+fastapi
+uvicorn
