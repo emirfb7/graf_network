@@ -86,8 +86,10 @@ body {
 .graph-area {
   flex: 1;
   padding: 24px;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
+  flex-direction: column;
+  gap: 16px;
   align-items: stretch;
 }
 
@@ -99,7 +101,7 @@ body {
   box-shadow: var(--shadow);
 }
 
-.graph-card { flex: 1; display: flex; flex-direction: column; }
+.graph-card { flex: 1; display: flex; flex-direction: column; min-height: 520px; }
 .graph { flex: 1; border: 1px solid var(--border); border-radius: 12px; background: #0b1220; min-height: 400px; }
 
 h2 { margin: 0 0 12px; font-size: 18px; }
@@ -255,6 +257,73 @@ a.ghost {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #0b1220;
+}
+
+.coloring-results {
+  display: grid;
+  gap: 12px;
+}
+
+.coloring-table {
+  background: #0b1220;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.coloring-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.coloring-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.coloring-table th,
+.coloring-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.coloring-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.color-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.color-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.color-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  display: inline-block;
 }
 
 .sim-grid {

@@ -23,6 +23,13 @@ export async function runAlgorithm(algorithm, payload) {
   });
 }
 
+export async function runColoring(graph) {
+  return request("/algorithms/coloring/welsh-powell", {
+    method: "POST",
+    body: JSON.stringify({ graph }),
+  });
+}
+
 export async function listGraphs() {
   return request("/graphs");
 }

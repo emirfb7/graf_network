@@ -130,6 +130,26 @@ export function createVisRenderer(container) {
     if (updates.length) nodes.update(updates);
   };
 
+  const setNodeColors = (colorMap) => {
+    if (!nodes) return;
+    const updates = nodes.get().map((n) => {
+      const color = colorMap?.[n.id];
+      if (color) {
+        return {
+          id: n.id,
+          color: { background: color, border: color },
+          font: { color: "#0b1220" },
+        };
+      }
+      return {
+        id: n.id,
+        color: { ...baseNodeColor },
+        font: { ...baseNodeFont },
+      };
+    });
+    if (updates.length) nodes.update(updates);
+  };
+
   const highlightSimulation = ({
     visitedIds = [],
     currentId = null,
@@ -191,6 +211,7 @@ export function createVisRenderer(container) {
     onSelect,
     clearSelection,
     highlightNodes,
+    setNodeColors,
     clearHighlights,
     clearEdgeHighlights,
     highlightEdge,

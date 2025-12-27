@@ -1,5 +1,5 @@
 ﻿import { createVisRenderer } from "./graph/visNetworkGraph.js";
-import { runAlgorithm } from "./api/client.js";
+import { runAlgorithm, runColoring } from "./api/client.js";
 import { getGraphExportUrl, listGraphs, loadGraph, saveGraph } from "./api/client.js";
 
 class Graph {
@@ -110,6 +110,10 @@ const saveForm = document.getElementById("save-form");
 const saveNameInput = document.getElementById("save-name");
 const refreshSavesBtn = document.getElementById("refresh-saves");
 const savedList = document.getElementById("saved-list");
+const coloringRunBtn = document.getElementById("coloring-run");
+const coloringStatus = document.getElementById("coloring-status");
+const coloringLegend = document.getElementById("coloring-legend");
+const coloringResults = document.getElementById("coloring-results");
 const quickToggle = document.getElementById("quick-toggle");
 const quickPanel = document.getElementById("quick-panel");
 const selectedRow = document.getElementById("selected-row");
@@ -143,6 +147,20 @@ const simState = {
   algorithm: null,
   speed: 1,
 };
+const COLOR_PALETTE = [
+  "#22c55e",
+  "#f97316",
+  "#38bdf8",
+  "#facc15",
+  "#a855f7",
+  "#fb7185",
+  "#14b8a6",
+  "#eab308",
+  "#6366f1",
+  "#84cc16",
+  "#0ea5e9",
+  "#f43f5e",
+];
 
 function renderNodes() {
   nodeList.innerHTML = "";
@@ -584,6 +602,172 @@ function buildGraphPayloadForSave() {
   return { nodes, edges };
 }
 
+function getColorForIndex(index) {
+  const safeIndex = Number.isFinite(index) ? index : 0;
+  return COLOR_PALETTE[safeIndex % COLOR_PALETTE.length];
+}
+
+function setColoringStatus(text, isError = false) {
+  if (!coloringStatus) return;
+  coloringStatus.textContent = text;
+  coloringStatus.style.color = isError ? "#f87171" : "var(--muted)";
+}
+
+function resetColoringUI() {
+  setColoringStatus("Hazir");
+  if (coloringLegend) coloringLegend.innerHTML = "";
+  if (coloringResults) {
+    coloringResults.innerHTML = '<div class="muted">Henuz renklendirme yok</div>';
+  }
+  if (renderer.setNodeColors) renderer.setNodeColors({});
+}
+
+function computeComponents() {
+  const visited = new Set();
+  const components = [];
+  const nodes = Array.from(graph.nodes.keys()).sort();
+
+  for (const nodeId of nodes) {
+    if (visited.has(nodeId)) continue;
+    const component = [];
+    const queue = [nodeId];
+    visited.add(nodeId);
+
+    while (queue.length) {
+      const current = queue.shift();
+      component.push(current);
+      const neighbors = graph.getNeighborsSorted(current);
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    component.sort();
+    components.push(component);
+  }
+
+  return components;
+}
+
+function renderColoringLegend(indices) {
+  if (!coloringLegend) return;
+  coloringLegend.innerHTML = "";
+  if (!indices.length) {
+    const empty = document.createElement("span");
+    empty.className = "muted tiny";
+    empty.textContent = "Renk yok";
+    coloringLegend.appendChild(empty);
+    return;
+  }
+  indices.forEach((index) => {
+    const item = document.createElement("div");
+    item.className = "color-legend-item";
+    const swatch = document.createElement("span");
+    swatch.className = "color-swatch";
+    swatch.style.background = getColorForIndex(index);
+    const label = document.createElement("span");
+    label.textContent = `Renk ${index}`;
+    item.appendChild(swatch);
+    item.appendChild(label);
+    coloringLegend.appendChild(item);
+  });
+}
+
+function renderColoringTables(colorIndices, colorMap) {
+  if (!coloringResults) return;
+  coloringResults.innerHTML = "";
+  const components = computeComponents();
+  if (!components.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent = "Graf bos";
+    coloringResults.appendChild(empty);
+    return;
+  }
+
+  components.forEach((component, idx) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "coloring-table";
+
+    const title = document.createElement("div");
+    title.className = "coloring-title";
+    title.textContent = `Topluluk ${idx + 1} (${component.length} dugum)`;
+
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    ["Dugum", "Renk"].forEach((label) => {
+      const th = document.createElement("th");
+      th.textContent = label;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    component.forEach((nodeId) => {
+      const row = document.createElement("tr");
+      const nodeCell = document.createElement("td");
+      nodeCell.textContent = nodeId;
+
+      const colorCell = document.createElement("td");
+      const colorRow = document.createElement("div");
+      colorRow.className = "color-row";
+      const swatch = document.createElement("span");
+      swatch.className = "color-swatch";
+      const colorIndex = colorIndices[nodeId];
+      const colorValue = colorMap[nodeId] || "#64748b";
+      swatch.style.background = colorValue;
+      const label = document.createElement("span");
+      label.textContent = colorIndex === undefined ? "-" : String(colorIndex);
+      colorRow.appendChild(swatch);
+      colorRow.appendChild(label);
+      colorCell.appendChild(colorRow);
+
+      row.appendChild(nodeCell);
+      row.appendChild(colorCell);
+      tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+    wrapper.appendChild(title);
+    wrapper.appendChild(table);
+    coloringResults.appendChild(wrapper);
+  });
+}
+
+async function applyColoring() {
+  if (!graph.nodes.size) {
+    setColoringStatus("Graf bos", true);
+    return;
+  }
+  stopSimulation(true);
+  setColoringStatus("Renklendiriliyor...");
+  try {
+    const payload = buildGraphPayloadForSave();
+    const res = await runColoring(payload);
+    const colorIndices = res.colors || {};
+    const colorMap = {};
+    const used = [];
+    Object.entries(colorIndices).forEach(([nodeId, index]) => {
+      const numeric = Number(index);
+      colorMap[nodeId] = getColorForIndex(numeric);
+      used.push(numeric);
+    });
+    const uniqueIndices = Array.from(new Set(used)).sort((a, b) => a - b);
+    if (renderer.setNodeColors) renderer.setNodeColors(colorMap);
+    renderColoringLegend(uniqueIndices);
+    renderColoringTables(colorIndices, colorMap);
+    const count = res.color_count ?? uniqueIndices.length;
+    setColoringStatus(`Tamamlandi - ${count} renk`);
+  } catch (err) {
+    setColoringStatus(err.message || "Renklendirme hatasi", true);
+  }
+}
+
 function renderSavedList(records) {
   if (!savedList) return;
   savedList.innerHTML = "";
@@ -729,6 +913,7 @@ if (saveForm)
       setResult(err.message || "Kayit hatasi", true);
     }
   });
+if (coloringRunBtn) coloringRunBtn.addEventListener("click", applyColoring);
 
 nodeForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -737,6 +922,7 @@ nodeForm.addEventListener("submit", (e) => {
   const label = form.get("label") || "";
   try {
     stopSimulation(true);
+    resetColoringUI();
     graph.addNode(id, label);
     refreshView();
     setResult(`Dugum eklendi: ${id}`);
@@ -754,6 +940,7 @@ edgeForm.addEventListener("submit", (e) => {
   const weight = form.get("weight");
   try {
     stopSimulation(true);
+    resetColoringUI();
     graph.addEdge(from, to, weight === null ? null : weight);
     refreshView();
     setResult(`Kenar eklendi: ${formatEdge(from, to)}`);
@@ -786,6 +973,7 @@ algoForm.addEventListener("submit", (e) => {
 
 resetBtn.addEventListener("click", () => {
   stopSimulation(true);
+  resetColoringUI();
   graph.reset();
   renderer.reset();
   renderer.clearSelection();
@@ -904,6 +1092,7 @@ function parseCsv(text) {
 
 function loadGraphData(nodesMap, edges) {
   stopSimulation(true);
+  resetColoringUI();
   renderer.clearHighlights();
   graph.reset();
   nodesMap.forEach((label, id) => {
@@ -999,6 +1188,7 @@ deleteSelectedBtn.addEventListener("click", () => {
   if (!selectedItem) return;
   try {
     stopSimulation(true);
+    resetColoringUI();
     if (selectedItem.type === "node") {
       graph.removeNode(selectedItem.id);
     } else {
@@ -1017,6 +1207,7 @@ deleteNodeInfoBtn.addEventListener("click", () => {
   if (!selectedItem || selectedItem.type !== "node") return;
   try {
     stopSimulation(true);
+    resetColoringUI();
     graph.removeNode(selectedItem.id);
     renderer.clearSelection();
     refreshView();
@@ -1028,5 +1219,6 @@ deleteNodeInfoBtn.addEventListener("click", () => {
 });
 
 refreshView();
+resetColoringUI();
 renderFileList();
 refreshSavedGraphs();
