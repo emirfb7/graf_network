@@ -262,6 +262,17 @@ a.ghost {
   font-size: 18px;
 }
 
+.merge-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.merge-btn ion-icon {
+  font-size: 18px;
+}
+
 .icon-btn:hover {
   color: #ffffff;
   border-color: rgba(239, 68, 68, 1);

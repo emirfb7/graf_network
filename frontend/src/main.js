@@ -889,26 +889,71 @@ async function refreshSavedGraphs() {
   }
 }
 
+function graphPayloadToData(payload) {
+  const nodesMap = new Map();
+  (payload.nodes || []).forEach((node) => {
+    nodesMap.set(node.id, node.label || node.id);
+  });
+  const edges = (payload.edges || []).map((edge) => ({
+    from: edge.from,
+    to: edge.to,
+    relationType: edge.relation_type || "",
+    weight: edge.relation_degree ?? null,
+  }));
+  return { nodesMap, edges };
+}
+
+function addSavedGraphToPalette(record, nodesMap, edges) {
+  const existingIndex = uploadedFiles.findIndex(
+    (item) => item.source === "saved" && item.graphId === record.id
+  );
+  if (existingIndex >= 0) {
+    const existing = uploadedFiles[existingIndex];
+    existing.name = record.name || existing.name;
+    existing.nodesMap = nodesMap;
+    existing.edges = edges;
+    return existingIndex;
+  }
+  uploadedFiles.push({
+    id: `saved-${record.id}`,
+    name: record.name || record.id,
+    source: "saved",
+    graphId: record.id,
+    nodesMap,
+    edges,
+  });
+  return uploadedFiles.length - 1;
+}
+
 async function loadSavedGraph(graphId) {
   try {
     stopSimulation(true);
     const record = await loadGraph(graphId);
-    const payload = record.graph || {};
-    const nodesMap = new Map();
-    (payload.nodes || []).forEach((node) => {
-      nodesMap.set(node.id, node.label || node.id);
-    });
-    const edges = (payload.edges || []).map((edge) => ({
-      from: edge.from,
-      to: edge.to,
-      relationType: edge.relation_type || "",
-      weight: edge.relation_degree ?? null,
-    }));
+    const { nodesMap, edges } = graphPayloadToData(record.graph || {});
     loadGraphData(nodesMap, edges);
+    const paletteIndex = addSavedGraphToPalette(record, nodesMap, edges);
+    selectFileExclusive(paletteIndex);
+    if (fileStatus) fileStatus.textContent = `Yuklendi: ${record.name || record.id}`;
     setResult(`Kayit yuklendi: ${record.name || record.id}`);
   } catch (err) {
     setResult(err.message || "Kayit yuklenemedi", true);
   }
+}
+
+function addFileToPalette(file) {
+  uploadedFiles.push({
+    id: `file-${uploadedFiles.length + 1}`,
+    name: file.name,
+    source: "file",
+    file,
+  });
+  return uploadedFiles.length - 1;
+}
+
+function selectFileExclusive(idx) {
+  selectedFileOrder.length = 0;
+  selectedFileOrder.push(idx);
+  renderFileList();
 }
 
 function renderFileList() {
@@ -1061,7 +1106,7 @@ fileForm.addEventListener("submit", (e) => {
     fileStatus.textContent = "Sadece CSV veya Excel yukleyin";
     return;
   }
-  uploadedFiles.push({ name: file.name, file });
+  addFileToPalette(file);
   renderFileList();
   fileStatus.textContent = `Yukleme hazir: ${file.name}`;
 });
@@ -1071,13 +1116,15 @@ fileList.addEventListener("click", async (e) => {
   if (!(target instanceof HTMLElement)) return;
   const idx = target.dataset.index;
   if (idx === undefined) return;
-  const fileObj = uploadedFiles[Number(idx)];
+  const index = Number(idx);
+  const fileObj = uploadedFiles[index];
   if (!fileObj) return;
-  toggleFileSelection(Number(idx), target);
+  toggleFileSelection(index);
   try {
     fileStatus.textContent = `Okunuyor: ${fileObj.name}`;
-    await loadGraphFromFile(fileObj.file);
-    setResult(`Dosyadan yuklendi: ${fileObj.name}`);
+    const { nodesMap, edges } = await getGraphDataFromItem(fileObj);
+    loadGraphData(nodesMap, edges);
+    setResult(`Yuklendi: ${fileObj.name}`);
     fileStatus.textContent = `Yuklendi: ${fileObj.name}`;
     updateSelectedUI(null);
   } catch (err) {
@@ -1099,7 +1146,11 @@ mergeBtn.addEventListener("click", async () => {
   }
   try {
     fileStatus.textContent = `Merge yapiliyor: ${base.name} + ${other.name}`;
-    const merged = await mergeFiles(base.file, other.file);
+    const [baseData, otherData] = await Promise.all([
+      getGraphDataFromItem(base),
+      getGraphDataFromItem(other),
+    ]);
+    const merged = mergeGraphData(baseData, otherData);
     loadGraphData(merged.nodesMap, merged.edges);
     setResult(`Merge tamamlandi: ${base.name} + ${other.name}`);
     fileStatus.textContent = "Merge tamam";
@@ -1109,12 +1160,6 @@ mergeBtn.addEventListener("click", async () => {
     fileStatus.textContent = err.message || "Merge hatasi";
   }
 });
-
-async function loadGraphFromFile(file) {
-  const text = await file.text();
-  const { nodesMap, edges } = parseCsv(text);
-  loadGraphData(nodesMap, edges);
-}
 
 function parseCsv(text) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -1155,6 +1200,28 @@ function parseCsv(text) {
   return { nodesMap, edges };
 }
 
+async function getGraphDataFromItem(item) {
+  if (!item) throw new Error("Dosya verisi bulunamadi");
+  if (item.nodesMap && item.edges) {
+    return { nodesMap: item.nodesMap, edges: item.edges };
+  }
+  if (item.file) {
+    const text = await item.file.text();
+    const parsed = parseCsv(text);
+    item.nodesMap = parsed.nodesMap;
+    item.edges = parsed.edges;
+    return parsed;
+  }
+  if (item.graphId) {
+    const record = await loadGraph(item.graphId);
+    const parsed = graphPayloadToData(record.graph || {});
+    item.nodesMap = parsed.nodesMap;
+    item.edges = parsed.edges;
+    return parsed;
+  }
+  throw new Error("Dosya verisi okunamadi");
+}
+
 function loadGraphData(nodesMap, edges) {
   stopSimulation(true);
   resetColoringUI();
@@ -1178,16 +1245,14 @@ function loadGraphData(nodesMap, edges) {
   updateSelectedUI(null);
 }
 
-function toggleFileSelection(idx, element) {
+function toggleFileSelection(idx) {
   const existingIndex = selectedFileOrder.indexOf(idx);
   if (existingIndex >= 0) {
     selectedFileOrder.splice(existingIndex, 1);
   } else {
     selectedFileOrder.push(idx);
     if (selectedFileOrder.length > 2) {
-      const removed = selectedFileOrder.shift();
-      const toUnselect = fileList.querySelector(`[data-index="${removed}"]`);
-      if (toUnselect) toUnselect.classList.remove("selected");
+      selectedFileOrder.shift();
     }
   }
   renderFileList();
@@ -1217,11 +1282,7 @@ function buildAlgorithmPayload(startId) {
   return { start_id: startId.trim(), graph: { nodes, edges } };
 }
 
-async function mergeFiles(baseFile, otherFile) {
-  const [baseText, otherText] = await Promise.all([baseFile.text(), otherFile.text()]);
-  const baseParsed = parseCsv(baseText);
-  const otherParsed = parseCsv(otherText);
-
+function mergeGraphData(baseParsed, otherParsed) {
   const nodesMap = new Map(baseParsed.nodesMap);
   const edges = [];
   const edgeSet = new Set();
