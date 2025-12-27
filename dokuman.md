@@ -98,6 +98,12 @@ Her düğüm, sayısal özellikleriyle bir **CSV tablosunda** tutulmalıdır:
 | 1       | 0.8      | 12        | 3               | 2,4,5    |
 | 2       | 0.4      | 5         | 2               | 1,3      |
 
+Örnek CSV başlığı:
+
+```text
+DugumId,Ozellik_I (Aktiflik),Ozellik_II (Etkilesim),Ozellik_III (Bagl. Sayisi),Komsular
+```
+
 ### **Ağırlık Formülü**
 
 ```

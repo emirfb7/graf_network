@@ -1339,7 +1339,43 @@ function splitCsvLine(line) {
 }
 
 function normalizeHeader(value) {
-  return value.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9_]/g, "");
+  if (value === null || value === undefined) return "";
+  let text = String(value);
+  text = text.replace(/^\uFEFF/, "");
+  text = text.replace(/\(.*?\)/g, "");
+  text = text.replace(/[çÇğĞıİöÖşŞüÜ]/g, (char) => {
+    switch (char) {
+      case "ç":
+      case "Ç":
+        return "c";
+      case "ğ":
+      case "Ğ":
+        return "g";
+      case "ı":
+      case "İ":
+        return "i";
+      case "ö":
+      case "Ö":
+        return "o";
+      case "ş":
+      case "Ş":
+        return "s";
+      case "ü":
+      case "Ü":
+        return "u";
+      default:
+        return char;
+    }
+  });
+  return text.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9_]/g, "");
+}
+
+function findHeaderIndex(header, candidates) {
+  for (const candidate of candidates) {
+    const idx = header.indexOf(candidate);
+    if (idx >= 0) return idx;
+  }
+  return -1;
 }
 
 function coerceNumber(value) {
@@ -1412,11 +1448,18 @@ function parseEdgeCsv(lines, header) {
 }
 
 function parseNodeCsv(lines, header) {
-  const idIndex = header.indexOf("dugumid");
-  const activityIndex = header.indexOf("ozellik_i");
-  const interactionIndex = header.indexOf("ozellik_ii");
-  const connectionIndex = header.indexOf("ozellik_iii");
-  const neighborsIndex = header.indexOf("komsular");
+  const idIndex = findHeaderIndex(header, ["dugumid", "nodeid", "id"]);
+  const activityIndex = findHeaderIndex(header, ["ozellik_i", "aktiflik", "activity"]);
+  const interactionIndex = findHeaderIndex(header, ["ozellik_ii", "etkilesim", "interaction"]);
+  const connectionIndex = findHeaderIndex(header, [
+    "ozellik_iii",
+    "baglsayisi",
+    "baglantisayisi",
+    "baglantisayi",
+    "connectioncount",
+    "degree",
+  ]);
+  const neighborsIndex = findHeaderIndex(header, ["komsular", "neighbors", "neighbours"]);
   if ([idIndex, activityIndex, interactionIndex, connectionIndex, neighborsIndex].some((idx) => idx < 0)) {
     throw new Error("CSV basliklari hatali");
   }
@@ -1475,7 +1518,7 @@ function parseCsv(text) {
   if (header.includes("source_id")) {
     return parseEdgeCsv(lines, header);
   }
-  if (header.includes("dugumid")) {
+  if (findHeaderIndex(header, ["dugumid", "nodeid", "id"]) >= 0) {
     return parseNodeCsv(lines, header);
   }
   throw new Error("CSV basliklari hatali");

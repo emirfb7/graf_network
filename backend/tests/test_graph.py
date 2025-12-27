@@ -46,7 +46,13 @@ def test_nodes_to_csv_includes_neighbors():
     csv_text = csv_repository.nodes_to_csv(payload)
     reader = csv.reader(io.StringIO(csv_text))
     rows = list(reader)
-    assert rows[0] == ["DugumId", "Ozellik_I", "Ozellik_II", "Ozellik_III", "Komsular"]
+    assert rows[0] == [
+        "DugumId",
+        "Ozellik_I (Aktiflik)",
+        "Ozellik_II (Etkilesim)",
+        "Ozellik_III (Bagl. Sayisi)",
+        "Komsular",
+    ]
     neighbors = {row[0]: row[4] for row in rows[1:]}
     assert neighbors.get("1") == "2"
     assert neighbors.get("2") == "1"

@@ -207,15 +207,15 @@ Düğümler, aşağıdaki alanlardan oluşan bir CSV dosyasında saklanır:
 | Sütun Adı     | Açıklama                              |
 | ------------- | ------------------------------------- |
 | `DugumId`     | Benzersiz düğüm kimliği               |
-| `Ozellik_I`   | Aktiflik (0–1 arası float)            |
-| `Ozellik_II`  | Etkileşim sayısı veya skoru           |
-| `Ozellik_III` | Bağlantı sayısı                       |
+| `Ozellik_I (Aktiflik)`   | Aktiflik (0–1 arası float)            |
+| `Ozellik_II (Etkilesim)` | Etkileşim sayısı veya skoru           |
+| `Ozellik_III (Bagl. Sayisi)` | Bağlantı sayısı                       |
 | `Komsular`    | Virgülle ayrılmış komşu düğüm Id’leri |
 
 Örnek:
 
 ```text
-DugumId,Ozellik_I,Ozellik_II,Ozellik_III,Komsular
+DugumId,Ozellik_I (Aktiflik),Ozellik_II (Etkilesim),Ozellik_III (Bagl. Sayisi),Komsular
 1,0.8,12,3,"2,4,5"
 2,0.4,5,2,"1,3"
 ```

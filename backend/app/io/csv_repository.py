@@ -43,7 +43,15 @@ def graph_to_csv(graph: GraphPayload) -> str:
 def nodes_to_csv(graph: GraphPayload) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["DugumId", "Ozellik_I", "Ozellik_II", "Ozellik_III", "Komsular"])
+    writer.writerow(
+        [
+            "DugumId",
+            "Ozellik_I (Aktiflik)",
+            "Ozellik_II (Etkilesim)",
+            "Ozellik_III (Bagl. Sayisi)",
+            "Komsular",
+        ]
+    )
 
     neighbors: Dict[str, Set[str]] = {}
     for node in graph.nodes:
