@@ -186,6 +186,11 @@ const nodeList = document.getElementById("node-list");
 const edgeList = document.getElementById("edge-list");
 const algoResult = document.getElementById("algo-result");
 const startInput = algoForm.querySelector("input[name=\"start\"]");
+const endInput = document.getElementById("end-node");
+const endNodeRow = document.getElementById("end-node-row");
+const pathSummary = document.getElementById("path-summary");
+const pathStartLabel = document.getElementById("path-start-label");
+const pathEndLabel = document.getElementById("path-end-label");
 const algoSelect = document.getElementById("algorithm-select");
 const simToggleBtn = document.getElementById("sim-toggle");
 const simResetBtn = document.getElementById("sim-reset");
@@ -236,11 +241,22 @@ const uploadedFiles = [];
 const selectedFileOrder = [];
 let selectedItem = null;
 let savedGraphs = [];
-const algoColors = { bfs: "#22c55e", dfs: "#f59e0b" };
+const algoColors = {
+  bfs: "#22c55e",
+  dfs: "#f59e0b",
+  dijkstra: "#38bdf8",
+  astar: "#f97316",
+};
 const simColors = {
   current: "#facc15",
   edge: "#f97316",
   edgeSkip: "#64748b",
+};
+const pathColors = {
+  path: "#22c55e",
+  start: "#facc15",
+  end: "#ef4444",
+  edge: "#22c55e",
 };
 const SIM_BASE_INTERVAL = 1000;
 const simState = {
@@ -255,6 +271,10 @@ const simState = {
 const confirmState = {
   action: null,
   id: null,
+};
+const pathSelection = {
+  startId: null,
+  endId: null,
 };
 const COLOR_PALETTE = [
   "#22c55e",
@@ -330,6 +350,12 @@ function parseNumberField(value, fieldLabel, options = {}) {
   return num;
 }
 
+function getAlgorithmLabel(algorithm) {
+  if (algorithm === "astar") return "A*";
+  if (algorithm === "dijkstra") return "Dijkstra";
+  return algorithm.toUpperCase();
+}
+
 function renderAlgoResult(order, algorithm, activeIndex = null, emptyMessage = "Hic dugum yok") {
   const color = algoColors[algorithm] || "#38bdf8";
   if (!order.length) {
@@ -344,14 +370,80 @@ function renderAlgoResult(order, algorithm, activeIndex = null, emptyMessage = "
       return `<div class="${rowClass}"${rowStyle}><span>${idx + 1}</span><span>${nodeId}</span></div>`;
     })
     .join("");
-  algoResult.innerHTML = `<div class="algo-head" style="color:${color}">${algorithm.toUpperCase()} sonucu</div>${rows}`;
+  const label = getAlgorithmLabel(algorithm);
+  algoResult.innerHTML = `<div class="algo-head" style="color:${color}">${label} sonucu</div>${rows}`;
   algoResult.style.borderColor = "var(--border)";
+}
+
+function renderShortestPathResult(result, algorithm, startId, endId) {
+  const color = algoColors[algorithm] || "#38bdf8";
+  const visited = result.visited || result.order || [];
+  const path = result.path || [];
+  const cost = Number.isFinite(result.cost) ? result.cost.toFixed(4) : "-";
+  if (!visited.length) {
+    algoResult.textContent = "Hic dugum yok";
+    return;
+  }
+  const rows = visited
+    .map(
+      (nodeId, idx) =>
+        `<div class="row"><span>${idx + 1}</span><span>${nodeId}</span></div>`
+    )
+    .join("");
+  const pathText = path.length ? path.join(" -> ") : "Yol bulunamadi";
+  const meta = `<div class="algo-meta"><span>Baslangic: <strong>${startId}</strong></span><span>Bitis: <strong>${endId}</strong></span><span>Maliyet: <strong>${cost}</strong></span></div>`;
+  const label = getAlgorithmLabel(algorithm);
+  algoResult.innerHTML = `<div class="algo-head" style="color:${color}">${label} sonucu</div>${meta}<div class="algo-subhead">Ziyaret sirasi</div>${rows}<div class="algo-subhead">En kisa yol</div><div class="algo-path">${pathText}</div>`;
+  algoResult.style.borderColor = "var(--border)";
+}
+
+function highlightShortestPath(visited, path, algorithm, startId, endId) {
+  const visitedColor = algoColors[algorithm] || "#38bdf8";
+  renderer.clearHighlights();
+  renderer.highlightPath({
+    visitedIds: visited,
+    pathIds: path,
+    visitedColor,
+    pathColor: pathColors.path,
+    startId,
+    endId,
+    startColor: pathColors.start,
+    endColor: pathColors.end,
+  });
+  renderer.clearEdgeHighlights();
+  if (path.length < 2) return;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    renderer.highlightEdge(path[i], path[i + 1], pathColors.edge);
+  }
 }
 
 function updateAlgoSelectColor() {
   const algo = algoSelect.value;
   const color = algoColors[algo] || "#22c55e";
   algoSelect.style.setProperty("--algo-color", color);
+}
+
+function updateAlgorithmUI() {
+  const algorithm = algoSelect.value;
+  const needsEnd = isPathAlgorithm(algorithm);
+  if (endNodeRow) endNodeRow.classList.toggle("hidden", !needsEnd);
+  if (pathSummary) pathSummary.classList.toggle("hidden", !needsEnd);
+  if (endInput) {
+    endInput.required = needsEnd;
+    endInput.disabled = !needsEnd;
+  }
+
+  const simEnabled = isSimulationAlgorithm(algorithm);
+  if (simToggleBtn) simToggleBtn.disabled = !simEnabled;
+  if (simResetBtn) simResetBtn.disabled = !simEnabled;
+  if (simSpeedSelect) simSpeedSelect.disabled = !simEnabled;
+  if (!simEnabled) {
+    stopSimulation(true);
+    setSimStatus("Simulasyon sadece BFS/DFS");
+  } else {
+    setSimStatus("Hazir");
+  }
+  syncPathSummary();
 }
 
 function setSimStatus(text) {
@@ -410,11 +502,52 @@ function updateSimFrontierLabel(algorithm) {
   simFrontierLabel.textContent = algorithm === "dfs" ? "Yigin" : "Kuyruk";
 }
 
+function isPathAlgorithm(algorithm) {
+  return algorithm === "dijkstra" || algorithm === "astar";
+}
+
+function isSimulationAlgorithm(algorithm) {
+  return algorithm === "bfs" || algorithm === "dfs";
+}
+
+function syncPathSummary() {
+  if (pathStartLabel) pathStartLabel.textContent = pathSelection.startId || "-";
+  if (pathEndLabel) pathEndLabel.textContent = pathSelection.endId || "-";
+}
+
+function setPathStart(id) {
+  pathSelection.startId = id || null;
+  if (startInput) startInput.value = id || "";
+  syncPathSummary();
+}
+
+function setPathEnd(id) {
+  pathSelection.endId = id || null;
+  if (endInput) endInput.value = id || "";
+  syncPathSummary();
+}
+
+function clearPathSelection() {
+  pathSelection.startId = null;
+  pathSelection.endId = null;
+  if (startInput) startInput.value = "";
+  if (endInput) endInput.value = "";
+  syncPathSummary();
+}
+
 function validateStartId() {
   const startId = (startInput.value || "").trim();
   if (!startId) throw new Error("Baslangic dugumu bos olamaz");
   if (!graph.nodes.has(startId)) throw new Error("Baslangic dugumu yok");
   return startId;
+}
+
+function validateEndId(startId) {
+  const endId = (endInput?.value || "").trim();
+  if (!endId) throw new Error("Bitis dugumu bos olamaz");
+  if (!graph.nodes.has(endId)) throw new Error("Bitis dugumu yok");
+  if (endId === startId) throw new Error("Baslangic ve bitis ayni olamaz");
+  return endId;
 }
 
 function createStep({
@@ -563,6 +696,9 @@ function startSimulation() {
   try {
     stopSimulation(true);
     const algorithm = algoSelect.value;
+    if (!isSimulationAlgorithm(algorithm)) {
+      throw new Error("Simulasyon sadece BFS/DFS icin");
+    }
     const startId = validateStartId();
     const steps = buildSimulationSteps(algorithm, startId);
     if (!steps.length) {
@@ -655,7 +791,12 @@ function updateSelectedUI(item) {
   selectedRow.classList.remove("hidden");
   if (item.type === "node") {
     selectedLabel.textContent = `Dugum: ${item.id}`;
-    startInput.value = item.id;
+    const isCtrl = Boolean(item.ctrlKey);
+    if (isCtrl && pathSelection.startId && pathSelection.startId !== item.id) {
+      setPathEnd(item.id);
+    } else {
+      setPathStart(item.id);
+    }
     updateNodeInfo(item.id);
   } else {
     const rel = item.relationType ? ` [${item.relationType}]` : "";
@@ -1125,10 +1266,20 @@ renderer.onSelect((item) => updateSelectedUI(item));
 algoSelect.addEventListener("change", () => {
   stopSimulation(true);
   updateAlgoSelectColor();
+  updateAlgorithmUI();
 });
 updateAlgoSelectColor();
+updateAlgorithmUI();
 updateSimToggleLabel();
 nodeInfoToggle.addEventListener("click", toggleNodeInfoPanel);
+if (startInput)
+  startInput.addEventListener("input", () => {
+    setPathStart((startInput.value || "").trim());
+  });
+if (endInput)
+  endInput.addEventListener("input", () => {
+    setPathEnd((endInput.value || "").trim());
+  });
 if (simToggleBtn) simToggleBtn.addEventListener("click", toggleSimulation);
 if (simResetBtn) simResetBtn.addEventListener("click", () => stopSimulation(true));
 if (simSpeedSelect)
@@ -1215,14 +1366,20 @@ algoForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const form = new FormData(algoForm);
   const algorithm = form.get("algorithm");
-  const start = form.get("start") || "";
   try {
     stopSimulation(true);
-    const payload = buildAlgorithmPayload(start);
+    const startId = validateStartId();
+    const endId = isPathAlgorithm(algorithm) ? validateEndId(startId) : null;
+    const payload = buildAlgorithmPayload(startId, endId);
     runAlgorithm(algorithm, payload)
       .then((res) => {
-        renderAlgoResult(res.order, algorithm);
-        renderer.highlightNodes(res.order, algoColors[algorithm]);
+        if (isPathAlgorithm(algorithm)) {
+          renderShortestPathResult(res, algorithm, startId, endId);
+          highlightShortestPath(res.visited || res.order || [], res.path || [], algorithm, startId, endId);
+          return;
+        }
+        renderAlgoResult(res.order || [], algorithm);
+        renderer.highlightNodes(res.order || [], algoColors[algorithm]);
       })
       .catch((err) => {
         setResult(err.message, true);
@@ -1235,6 +1392,7 @@ algoForm.addEventListener("submit", (e) => {
 resetBtn.addEventListener("click", () => {
   stopSimulation(true);
   resetColoringUI();
+  clearPathSelection();
   graph.reset();
   renderer.reset();
   renderer.clearSelection();
@@ -1550,6 +1708,7 @@ function loadGraphData(nodesMap, edges) {
   stopSimulation(true);
   resetColoringUI();
   renderer.clearHighlights();
+  clearPathSelection();
   graph.reset();
   nodesMap.forEach((node, id) => {
     try {
@@ -1604,7 +1763,7 @@ function formatWeight(weight) {
   return num.toFixed(4);
 }
 
-function buildAlgorithmPayload(startId) {
+function buildAlgorithmPayload(startId, endId = null) {
   if (!startId.trim()) {
     throw new Error("Baslangic dugumu bos olamaz");
   }
@@ -1622,7 +1781,9 @@ function buildAlgorithmPayload(startId) {
     relation_type: e.relationType || "",
     relation_degree: e.weight ?? null,
   }));
-  return { start_id: startId.trim(), graph: { nodes, edges } };
+  const payload = { start_id: startId.trim(), graph: { nodes, edges } };
+  if (endId) payload.end_id = endId.trim();
+  return payload;
 }
 
 function mergeGraphData(baseParsed, otherParsed) {

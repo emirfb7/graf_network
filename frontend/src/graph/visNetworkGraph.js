@@ -16,6 +16,7 @@ export function createVisRenderer(container) {
   const edges = visAvailable ? new vis.DataSet() : null;
   let edgeCounter = 0;
   let selectHandler = null;
+  let lastSelectedNodes = [];
   let baseNodeColor = { background: "#0ea5e9", border: "#38bdf8" };
   let baseNodeFont = { color: "#e2e8f0" };
   let baseEdgeColor = { color: "#38bdf8", highlight: "#22c55e", hover: "#22c55e" };
@@ -48,13 +49,18 @@ export function createVisRenderer(container) {
     network = new vis.Network(container, data, options);
     network.on("select", (params) => {
       if (!selectHandler) return;
+      const ctrlKey = Boolean(params?.event?.srcEvent?.ctrlKey || params?.event?.ctrlKey);
       if (params.nodes?.length) {
-        const id = params.nodes[0];
+        const selectedNodes = params.nodes;
+        const newlySelected = selectedNodes.find((nodeId) => !lastSelectedNodes.includes(nodeId));
+        const id = newlySelected || selectedNodes[selectedNodes.length - 1];
+        lastSelectedNodes = [...selectedNodes];
         const n = nodes.get(id);
         selectHandler({
           type: "node",
           id,
           label: n?.label || id,
+          ctrlKey,
         });
         return;
       }
@@ -69,10 +75,14 @@ export function createVisRenderer(container) {
           label: e?.label || "",
           relationType: e?.relationType || "",
           weight: e?.weight ?? null,
+          ctrlKey,
         });
       }
     });
-    network.on("deselectNode", () => selectHandler && selectHandler(null));
+    network.on("deselectNode", () => {
+      lastSelectedNodes = [];
+      if (selectHandler) selectHandler(null);
+    });
     network.on("deselectEdge", () => selectHandler && selectHandler(null));
   }
 
@@ -184,6 +194,42 @@ export function createVisRenderer(container) {
     if (updates.length) nodes.update(updates);
   };
 
+  const highlightPath = ({
+    visitedIds = [],
+    pathIds = [],
+    visitedColor = "#38bdf8",
+    pathColor = "#22c55e",
+    startId = null,
+    endId = null,
+    startColor = "#facc15",
+    endColor = "#ef4444",
+  }) => {
+    if (!nodes) return;
+    const visitedSet = new Set(visitedIds);
+    const pathSet = new Set(pathIds);
+    const updates = nodes.get().map((n) => {
+      let color = { ...baseNodeColor };
+      let font = { ...baseNodeFont };
+      if (visitedSet.has(n.id)) {
+        color = { background: visitedColor, border: visitedColor };
+      }
+      if (pathSet.has(n.id)) {
+        color = { background: pathColor, border: pathColor };
+        font = { color: "#0b1220" };
+      }
+      if (startId && n.id === startId) {
+        color = { background: startColor, border: startColor };
+        font = { color: "#0b1220" };
+      }
+      if (endId && n.id === endId) {
+        color = { background: endColor, border: endColor };
+        font = { color: "#0b1220" };
+      }
+      return { id: n.id, color, font };
+    });
+    if (updates.length) nodes.update(updates);
+  };
+
   const clearEdgeHighlights = () => {
     if (!edges) return;
     const updates = edges.get().map((e) => ({
@@ -226,6 +272,7 @@ export function createVisRenderer(container) {
     clearEdgeHighlights,
     highlightEdge,
     highlightSimulation,
+    highlightPath,
   };
 }
 

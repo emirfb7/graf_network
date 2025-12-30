@@ -1,4 +1,6 @@
+from backend.app.algorithms.astar import AStarAlgorithm
 from backend.app.algorithms.bfs import BFSAlgorithm
+from backend.app.algorithms.dijkstra import DijkstraAlgorithm
 from backend.app.algorithms.dfs import DFSAlgorithm
 from backend.app.algorithms.welsh_powell import WelshPowellColoring
 from backend.app.domain.edge import Edge
@@ -68,13 +70,39 @@ def normalize_graph_payload(payload: GraphPayload) -> GraphPayload:
 def run_bfs(request: AlgorithmRequest) -> AlgorithmResponse:
     graph = _build_graph(request.graph)
     result = BFSAlgorithm().run(graph, request.start_id)
-    return AlgorithmResponse(order=result.order)
+    return AlgorithmResponse(order=result.order, visited=result.order)
 
 
 def run_dfs(request: AlgorithmRequest) -> AlgorithmResponse:
     graph = _build_graph(request.graph)
     result = DFSAlgorithm().run(graph, request.start_id)
-    return AlgorithmResponse(order=result.order)
+    return AlgorithmResponse(order=result.order, visited=result.order)
+
+
+def run_dijkstra(request: AlgorithmRequest) -> AlgorithmResponse:
+    if not request.end_id:
+        raise ValueError("End node not provided")
+    graph = _build_graph(request.graph)
+    result = DijkstraAlgorithm().run(graph, request.start_id, request.end_id)
+    return AlgorithmResponse(
+        order=result.visited,
+        visited=result.visited,
+        path=result.path,
+        cost=result.cost,
+    )
+
+
+def run_astar(request: AlgorithmRequest) -> AlgorithmResponse:
+    if not request.end_id:
+        raise ValueError("End node not provided")
+    graph = _build_graph(request.graph)
+    result = AStarAlgorithm().run(graph, request.start_id, request.end_id)
+    return AlgorithmResponse(
+        order=result.visited,
+        visited=result.visited,
+        path=result.path,
+        cost=result.cost,
+    )
 
 
 def run_welsh_powell(request: GraphRequest) -> ColoringResponse:

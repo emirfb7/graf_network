@@ -131,6 +131,8 @@
               <select name="algorithm" id="algorithm-select" class="algo-select">
                 <option value="bfs">BFS</option>
                 <option value="dfs">DFS</option>
+                <option value="dijkstra">Dijkstra</option>
+                <option value="astar">A*</option>
               </select>
             </label>
             <div class="legend">
@@ -140,6 +142,19 @@
             <label>Baslangic dugumu
               <input name="start" required placeholder="orn. A">
             </label>
+            <label id="end-node-row">Bitis dugumu
+              <input id="end-node" name="end" placeholder="orn. B">
+            </label>
+            <div id="path-summary" class="path-summary hidden">
+              <div class="path-pill">
+                <span>Baslangic</span>
+                <strong id="path-start-label">-</strong>
+              </div>
+              <div class="path-pill">
+                <span>Bitis</span>
+                <strong id="path-end-label">-</strong>
+              </div>
+            </div>
             <div class="algo-actions">
               <button type="submit">Calistir</button>
               <button type="button" id="sim-toggle" class="ghost">Simulasyon baslat</button>

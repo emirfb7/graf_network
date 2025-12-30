@@ -132,6 +132,11 @@ button {
 }
 button:hover { transform: translateY(-1px); }
 button:active { transform: translateY(0); }
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 button.ghost {
   background: transparent;
@@ -230,6 +235,30 @@ a.ghost {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
   align-items: end;
+}
+
+.path-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.path-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.6);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.path-pill strong {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .saved-item {
@@ -507,6 +536,39 @@ a.ghost {
   background: rgba(56, 189, 248, 0.15);
 }
 .output .row:last-child { border-bottom: none; }
+
+.algo-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.algo-meta strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.algo-subhead {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.algo-path {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px dashed var(--border);
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-word;
+}
 
 .modal-overlay {
   position: fixed;

@@ -27,6 +27,22 @@ def run_dfs(req: AlgorithmRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.post("/dijkstra", response_model=AlgorithmResponse)
+def run_dijkstra(req: AlgorithmRequest):
+    try:
+        return graph_service.run_dijkstra(req)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/astar", response_model=AlgorithmResponse)
+def run_astar(req: AlgorithmRequest):
+    try:
+        return graph_service.run_astar(req)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/coloring/welsh-powell", response_model=ColoringResponse)
 def run_welsh_powell(req: GraphRequest):
     try:

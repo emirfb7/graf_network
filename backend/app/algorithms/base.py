@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from backend.app.domain.graph import Graph
 
@@ -10,6 +10,16 @@ class AlgorithmResult:
 
     def dict(self):
         return {"order": self.order}
+
+
+class ShortestPathResult:
+    def __init__(self, visited: List[str], path: List[str], cost: Optional[float]):
+        self.visited = visited
+        self.path = path
+        self.cost = cost
+
+    def dict(self):
+        return {"visited": self.visited, "path": self.path, "cost": self.cost}
 
 
 class Algorithm(ABC):

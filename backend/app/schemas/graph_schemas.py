@@ -27,11 +27,15 @@ class GraphPayload(BaseModel):
 
 class AlgorithmRequest(BaseModel):
     start_id: str
+    end_id: Optional[str] = None
     graph: GraphPayload
 
 
 class AlgorithmResponse(BaseModel):
     order: List[str]
+    visited: Optional[List[str]] = None
+    path: Optional[List[str]] = None
+    cost: Optional[float] = None
 
 
 class GraphRequest(BaseModel):
