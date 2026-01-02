@@ -517,6 +517,8 @@ function toggleSidebar() {
   const collapsed = sidebar.classList.toggle("collapsed");
   toggleSidebarBtn.textContent = collapsed ? "Open sidebar" : "Close sidebar";
   toggleSidebarBtn.setAttribute("aria-expanded", (!collapsed).toString());
+  // Sidebar toggle butonunun genişliği değiştiğinde tema butonunu yeniden konumlandır
+  setTimeout(positionThemeToggle, 100);
 }
 
 function toggleQuickPanel() {
@@ -965,3 +967,55 @@ deleteNodeInfoBtn.addEventListener("click", () => {
 
 refreshView();
 renderFileList();
+
+// Tema yönetimi
+const themeToggle = document.getElementById("theme-toggle");
+const sidebarToggle = document.getElementById("toggle-sidebar");
+const html = document.documentElement;
+
+function getTheme() {
+  return localStorage.getItem("theme") || "dark";
+}
+
+function setTheme(theme) {
+  localStorage.setItem("theme", theme);
+  html.setAttribute("data-theme", theme);
+  updateThemeIcon(theme);
+}
+
+function updateThemeIcon(theme) {
+  if (themeToggle) {
+    themeToggle.textContent = theme === "light" ? "🌙" : "☀️";
+  }
+}
+
+function toggleTheme() {
+  const currentTheme = getTheme();
+  const newTheme = currentTheme === "dark" ? "light" : "dark";
+  setTheme(newTheme);
+}
+
+function positionThemeToggle() {
+  if (themeToggle && sidebarToggle) {
+    const sidebarRect = sidebarToggle.getBoundingClientRect();
+    const gap = 8; // Butonlar arası boşluk
+    themeToggle.style.left = `${sidebarRect.right + gap}px`;
+    themeToggle.style.top = `${sidebarRect.top}px`;
+  }
+}
+
+// Sayfa yüklendiğinde tema tercihini yükle
+const savedTheme = getTheme();
+setTheme(savedTheme);
+
+// Tema değiştirme butonuna event listener ekle
+if (themeToggle) {
+  themeToggle.addEventListener("click", toggleTheme);
+}
+
+// Tema butonunu close sidebar butonunun sağına yerleştir
+// Sayfa yüklendiğinde ve DOM hazır olduğunda konumlandır
+setTimeout(() => {
+  positionThemeToggle();
+}, 100);
+window.addEventListener("resize", positionThemeToggle);
