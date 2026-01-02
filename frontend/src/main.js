@@ -732,7 +732,9 @@ function parseCsv(text) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (!lines.length) throw new Error("CSV bos");
   const header = lines.shift().split(",").map((h) => h.trim().toLowerCase());
-  const expected = [
+  
+  // Edge list formatı kontrolü (source_id, source_name, target_id, target_name, relation_type, relation_degree)
+  const expectedEdgeFormat = [
     "source_id",
     "source_name",
     "target_id",
@@ -740,29 +742,98 @@ function parseCsv(text) {
     "relation_type",
     "relation_degree",
   ];
-  const isValidHeader =
-    header.length >= expected.length &&
-    expected.every((h, i) => header[i] === h);
-  if (!isValidHeader) throw new Error("CSV basliklari hatali");
+  const isEdgeFormat =
+    header.length >= expectedEdgeFormat.length &&
+    expectedEdgeFormat.every((h, i) => header[i] === h);
+  
+  // Node list formatı kontrolü (DugumId, Ozellik_I, Ozellik_II, Ozellik_III, Komsular)
+  const isNodeFormat = header.includes("dugumid") && header.includes("komsular");
+  
+  if (!isEdgeFormat && !isNodeFormat) {
+    throw new Error("CSV basliklari hatali. Beklenen format: Edge list (source_id, source_name, target_id, target_name, relation_type, relation_degree) veya Node list (DugumId, ..., Komsular)");
+  }
 
   const nodesMap = new Map();
   const edges = [];
 
-  for (const line of lines) {
-    const cols = line.split(",").map((c) => c.trim());
-    if (cols.length < 6) continue;
-    const [sid, sname, tid, tname, rtype, rdeg] = cols;
-    if (!sid || !tid) continue;
-    nodesMap.set(sid, sname || sid);
-    nodesMap.set(tid, tname || tid);
-    const weight = Number(rdeg);
-    edges.push({
-      from: sid,
-      to: tid,
-      weight: Number.isFinite(weight) ? weight : null,
-      relationType: rtype || "",
-    });
+  if (isEdgeFormat) {
+    // Edge list formatı
+    for (const line of lines) {
+      const cols = line.split(",").map((c) => c.trim());
+      if (cols.length < 6) continue;
+      const [sid, sname, tid, tname, rtype, rdeg] = cols;
+      if (!sid || !tid) continue;
+      nodesMap.set(sid, sname || sid);
+      nodesMap.set(tid, tname || tid);
+      const weight = Number(rdeg);
+      edges.push({
+        from: sid,
+        to: tid,
+        weight: Number.isFinite(weight) ? weight : null,
+        relationType: rtype || "",
+      });
+    }
+  } else if (isNodeFormat) {
+    // Node list formatı
+    const nodeIdIndex = header.indexOf("dugumid");
+    const neighborsIndex = header.indexOf("komsular");
+    
+    if (nodeIdIndex === -1 || neighborsIndex === -1) {
+      throw new Error("CSV'de DugumId veya Komsular sutunu bulunamadi");
+    }
+
+    for (const line of lines) {
+      // CSV parsing - tırnak içindeki değerleri dikkate al
+      const cols = [];
+      let current = "";
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          cols.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      cols.push(current.trim()); // Son sütun
+      
+      if (cols.length <= Math.max(nodeIdIndex, neighborsIndex)) continue;
+      
+      const nodeId = cols[nodeIdIndex];
+      const neighborsStr = cols[neighborsIndex].replace(/^"|"$/g, ""); // Tırnakları temizle
+      
+      if (!nodeId) continue;
+      
+      // Düğümü ekle
+      const nodeLabel = cols[1] || nodeId; // İkinci sütun genellikle isim/etiket
+      nodesMap.set(nodeId, nodeLabel || nodeId);
+      
+      // Komşuları parse et ve edge'leri oluştur
+      if (neighborsStr) {
+        const neighbors = neighborsStr.split(",").map((n) => n.trim()).filter(Boolean);
+        for (const neighbor of neighbors) {
+          if (neighbor && neighbor !== nodeId) {
+            // Her komşu için bir edge oluştur (undirected graph için)
+            const edgeKey = [nodeId, neighbor].sort().join("|");
+            if (!edges.some((e) => e.key === edgeKey)) {
+              edges.push({
+                from: nodeId,
+                to: neighbor,
+                weight: null,
+                relationType: "",
+                key: edgeKey,
+              });
+            }
+          }
+        }
+      }
+    }
   }
+
   if (!edges.length) throw new Error("CSV'de kenar bulunamadi");
   return { nodesMap, edges };
 }
