@@ -121,6 +121,7 @@ const deleteNodeInfoBtn = document.getElementById("delete-node-info");
 const uploadedFiles = [];
 const selectedFileOrder = [];
 let selectedItem = null;
+const fileDeleteMode = new Map(); // Dosya index -> delete mode (true/false)
 const algoColors = { bfs: "#22c55e", dfs: "#f59e0b" };
 const simColors = {
   current: "#facc15",
@@ -571,10 +572,25 @@ function renderFileList() {
   }
   uploadedFiles.forEach((fileObj, idx) => {
     const li = document.createElement("li");
-    li.textContent = fileObj.name;
     li.dataset.index = String(idx);
     li.classList.add("file-item");
     if (selectedFileOrder.includes(idx)) li.classList.add("selected");
+    if (fileDeleteMode.get(idx)) li.classList.add("delete-mode");
+    
+    // Dosya adı ve çöp kutusu ikonu
+    const fileNameSpan = document.createElement("span");
+    fileNameSpan.className = "file-name";
+    fileNameSpan.textContent = fileObj.name;
+    li.appendChild(fileNameSpan);
+    
+    if (fileDeleteMode.get(idx)) {
+      const deleteIcon = document.createElement("span");
+      deleteIcon.className = "delete-icon";
+      deleteIcon.textContent = "🗑️";
+      deleteIcon.setAttribute("aria-label", "Sil");
+      li.appendChild(deleteIcon);
+    }
+    
     fileList.appendChild(li);
   });
 }
@@ -680,14 +696,167 @@ fileForm.addEventListener("submit", (e) => {
   fileStatus.textContent = `Yukleme hazir: ${file.name}`;
 });
 
-fileList.addEventListener("click", async (e) => {
-  const target = e.target;
-  if (!(target instanceof HTMLElement)) return;
-  const idx = target.dataset.index;
+// Dosya silme işlemi
+function deleteFile(idx) {
+  if (idx < 0 || idx >= uploadedFiles.length) return;
+  const fileName = uploadedFiles[idx].name;
+  uploadedFiles.splice(idx, 1);
+  // Seçili dosya listesinden de çıkar
+  const selectedIndex = selectedFileOrder.indexOf(idx);
+  if (selectedIndex >= 0) {
+    selectedFileOrder.splice(selectedIndex, 1);
+  }
+  // Daha büyük index'leri güncelle
+  selectedFileOrder.forEach((selectedIdx, i) => {
+    if (selectedIdx > idx) {
+      selectedFileOrder[i] = selectedIdx - 1;
+    }
+  });
+  // Delete mode'u temizle
+  fileDeleteMode.delete(idx);
+  // Daha büyük index'lerin delete mode'unu güncelle
+  const newDeleteMode = new Map();
+  fileDeleteMode.forEach((value, key) => {
+    if (key < idx) {
+      newDeleteMode.set(key, value);
+    } else if (key > idx) {
+      newDeleteMode.set(key - 1, value);
+    }
+  });
+  fileDeleteMode.clear();
+  newDeleteMode.forEach((value, key) => fileDeleteMode.set(key, value));
+  
+  renderFileList();
+  setResult(`Dosya silindi: ${fileName}`);
+  fileStatus.textContent = uploadedFiles.length ? `${uploadedFiles.length} dosya yuklu` : "Henuz dosya yok";
+}
+
+// Long press detection
+let longPressTimer = null;
+let longPressTarget = null;
+let isLongPress = false;
+
+fileList.addEventListener("mousedown", (e) => {
+  const fileItem = e.target.closest(".file-item");
+  if (!fileItem) return;
+  const idx = fileItem.dataset.index;
   if (idx === undefined) return;
-  const fileObj = uploadedFiles[Number(idx)];
+  
+  // Eğer zaten delete mode'daysa, normal click işlemi yapılacak
+  if (fileDeleteMode.get(Number(idx))) {
+    return;
+  }
+  
+  isLongPress = false;
+  longPressTarget = fileItem;
+  longPressTimer = setTimeout(() => {
+    const fileIdx = Number(idx);
+    isLongPress = true;
+    fileDeleteMode.set(fileIdx, true);
+    renderFileList();
+    setResult("Dosyayi silmek icin tekrar tiklayin", true);
+    longPressTimer = null;
+    longPressTarget = null;
+  }, 500); // 500ms basılı tutma
+});
+
+fileList.addEventListener("mouseup", (e) => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  // Eğer long press yapıldıysa, normal click'i engelle
+  if (isLongPress) {
+    e.preventDefault();
+    e.stopPropagation();
+    isLongPress = false;
+  }
+  longPressTarget = null;
+});
+
+fileList.addEventListener("mouseleave", (e) => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  longPressTarget = null;
+  isLongPress = false;
+});
+
+// Touch events için
+fileList.addEventListener("touchstart", (e) => {
+  const fileItem = e.target.closest(".file-item");
+  if (!fileItem) return;
+  const idx = fileItem.dataset.index;
+  if (idx === undefined) return;
+  
+  // Eğer zaten delete mode'daysa, normal click işlemi yapılacak
+  if (fileDeleteMode.get(Number(idx))) {
+    return;
+  }
+  
+  isLongPress = false;
+  longPressTarget = fileItem;
+  longPressTimer = setTimeout(() => {
+    const fileIdx = Number(idx);
+    isLongPress = true;
+    fileDeleteMode.set(fileIdx, true);
+    renderFileList();
+    setResult("Dosyayi silmek icin tekrar tiklayin", true);
+    longPressTimer = null;
+    longPressTarget = null;
+  }, 500);
+});
+
+fileList.addEventListener("touchend", (e) => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  // Eğer long press yapıldıysa, normal click'i engelle
+  if (isLongPress) {
+    e.preventDefault();
+    e.stopPropagation();
+    isLongPress = false;
+  }
+  longPressTarget = null;
+});
+
+fileList.addEventListener("touchcancel", () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  longPressTarget = null;
+  isLongPress = false;
+});
+
+fileList.addEventListener("click", async (e) => {
+  const fileItem = e.target.closest(".file-item");
+  if (!fileItem) return;
+  const idx = fileItem.dataset.index;
+  if (idx === undefined) return;
+  const fileIdx = Number(idx);
+  const fileObj = uploadedFiles[fileIdx];
   if (!fileObj) return;
-  toggleFileSelection(Number(idx), target);
+  
+  // Eğer delete mode'daysa sil
+  if (fileDeleteMode.get(fileIdx)) {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteFile(fileIdx);
+    return;
+  }
+  
+  // Long press yapıldıysa normal click'i yok say
+  if (isLongPress) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+  
+  // Normal tıklama - dosya seçimi ve yükleme
+  toggleFileSelection(fileIdx, fileItem);
   try {
     fileStatus.textContent = `Okunuyor: ${fileObj.name}`;
     await loadGraphFromFile(fileObj.file);
@@ -697,6 +866,38 @@ fileList.addEventListener("click", async (e) => {
   } catch (err) {
     fileStatus.textContent = err.message || "Dosya okunamadi";
     setResult(err.message || "Dosya okunamadi", true);
+  }
+});
+
+// Delete mode'dan çıkış için ESC tuşu ve dışarı tıklama
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && fileDeleteMode.size > 0) {
+    clearDeleteMode();
+    setResult("Silme modu iptal edildi");
+  }
+});
+
+// Dosya listesi dışına tıklanınca delete mode'u temizle
+document.addEventListener("click", (e) => {
+  // Eğer tıklama dosya listesi içindeyse ve delete mode'daki bir dosyaya değilse, işleme devam et
+  if (fileList.contains(e.target)) {
+    const fileItem = e.target.closest(".file-item");
+    if (fileItem) {
+      const idx = fileItem.dataset.index;
+      if (idx !== undefined && fileDeleteMode.get(Number(idx))) {
+        // Delete mode'daki dosyaya tıklandı, silme işlemi yapılacak
+        return;
+      }
+    }
+  }
+  
+  // Dosya listesi dışına tıklanınca veya delete mode dışındaki bir dosyaya tıklanınca delete mode'u temizle
+  if (fileDeleteMode.size > 0) {
+    const clickedFileItem = e.target.closest(".file-item");
+    if (!clickedFileItem || !fileDeleteMode.has(Number(clickedFileItem.dataset.index))) {
+      clearDeleteMode();
+      setResult("Silme modu iptal edildi");
+    }
   }
 });
 
@@ -860,6 +1061,11 @@ function loadGraphData(nodesMap, edges) {
   });
   refreshView();
   updateSelectedUI(null);
+}
+
+function clearDeleteMode() {
+  fileDeleteMode.clear();
+  renderFileList();
 }
 
 function toggleFileSelection(idx, element) {
